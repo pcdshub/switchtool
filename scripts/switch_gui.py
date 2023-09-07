@@ -28,7 +28,7 @@ def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("-s","--switch", type=str,
-                       help="Name of switch")
+                        help="Name of switch", required=True)
 
     parser.add_argument("-u","--user",type=str,
                        help="Username for switch login")
