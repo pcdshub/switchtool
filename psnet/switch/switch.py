@@ -42,8 +42,13 @@ def determine_type(nc, name):
                 module_logger.info("%s is a%s %s switch." % (name, "n" if s[0] in 'aeiou' else "", s))
                 return s
     except:
-        pass
-    return None
+        d = ""
+    raise RuntimeError(
+        f"Switch {name} is either an unsupported type or does not have "
+        "the switch type in its netconfig description. "
+        f'The description was "{d}", and the '
+        f"supported switch types are {', '.join(switch_types.keys())}. "
+    )
 
 """
 What do we have in here?
