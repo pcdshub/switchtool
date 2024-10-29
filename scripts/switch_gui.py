@@ -18,12 +18,6 @@ def read_creds():
     return d
 
 def main():
-    log = logging.getLogger('psnet.switch')
-    stream = logging.StreamHandler()
-    stream.setLevel(logging.WARNING)
-    log.addHandler(stream)
-    creds = read_creds()
-
     #Parse arguments
     parser = argparse.ArgumentParser()
 
@@ -38,12 +32,20 @@ def main():
 
     parser.add_argument("-t","--timeout",type=float,
                        help="Timeout for switch refresh (hours, default 1)")
+    
+    parser.add_argument("-v","--verbose",action="count",default=0,
+                        help="Increase stderr logging verbosity for each v")
 
     kwargs = vars(parser.parse_args())
-    
     if not kwargs.get('switch'):
         print ('Use --switch argument to provide switch name')
         return None
+
+    log = logging.getLogger('psnet.switch')
+    stream = logging.StreamHandler()
+    stream.setLevel(max(0, logging.WARNING - 10 * kwargs["verbose"]))
+    log.addHandler(stream)
+    creds = read_creds()
 
     #Launch GUI
     app = QApplication(sys.argv)
