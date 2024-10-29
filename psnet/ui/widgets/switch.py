@@ -52,12 +52,15 @@ class SwitchWidget(QtWidgets.QWidget):
         self.move_button.clicked.connect(self.move_port)
         self.configure_button = QtWidgets.QPushButton('Auto Configure')
         self.configure_button.clicked.connect(self.auto_configure)
+        self.write_memory_button = QtWidgets.QPushButton('Write Memory')
+        self.write_memory_button.clicked.connect(self.write_memory)
         
         self.move_layout = QtWidgets.QHBoxLayout()
         self.move_layout.addWidget(self.refresh_button)
         self.move_layout.addWidget(self.survey_button)
         self.move_layout.addWidget(self.move_button)
         self.move_layout.addWidget(self.configure_button)
+        self.move_layout.addWidget(self.write_memory_button)
         
         self.utilities.setLayout(self.move_layout)
 
@@ -388,6 +391,12 @@ class SwitchWidget(QtWidgets.QWidget):
             for move in approved:
                 device,port,subnet = move
                 self._switch.move_device(device,subnet=subnet)
+
+    def write_memory(self):
+        """
+        Run the "write memory" command to make the switch config persist on boot.
+        """
+        self._switch.write_memory()
 
 
 class PyQtSwitch(Switch):
