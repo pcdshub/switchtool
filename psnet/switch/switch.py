@@ -680,7 +680,7 @@ class Switch(netconfig.host.Host):
 
     def write_memory(self):
         """
-        Save the currenty config to the switch so that it persists after next reboot.
+        Save the current config to the switch so that it persists after next reboot.
         """
         # This is a privileged command: do we need/have the enable password?
         if not self._enablepw and self._surveyer().check_mode(self.name):
