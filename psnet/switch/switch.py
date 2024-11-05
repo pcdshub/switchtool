@@ -700,8 +700,10 @@ class Switch(netconfig.host.Host):
             module_logger.info("Bad enable password!")
             self._enablepw = None
             out_code = 1
+            resp="Bad enable password"
         except Exception:
             out_code = 1
+            resp=""
         if out_code:
             module_logger.error(f"Write memory had an error: {resp}")
         else:
