@@ -42,8 +42,13 @@ def determine_type(nc, name):
                 module_logger.info("%s is a%s %s switch." % (name, "n" if s[0] in 'aeiou' else "", s))
                 return s
     except:
-        pass
-    return None
+        d = ""
+    raise RuntimeError(
+        f"Switch {name} is either an unsupported type or does not have "
+        "the switch type in its netconfig description. "
+        f'The description was "{d}", and the '
+        f"supported switch types are {', '.join(switch_types.keys())}. "
+    )
 
 """
 What do we have in here?
@@ -673,7 +678,36 @@ class Switch(netconfig.host.Host):
             module_logger.warn('{:} remains on the wrong '\
                                'subnet'.format(unmoveable))
 
+    def write_memory(self):
+        """
+        Save the current config to the switch so that it persists after next reboot.
+        """
+        # This is a privileged command: do we need/have the enable password?
+        if not self._enablepw and self._surveyer().check_mode(self.name):
+            self.get_enablepw()
 
+        commands = ['write memory']
+        cmd = self._surveyer()._cmd_runner(self._user,
+                                           self._pw,
+                                           self._enablepw,
+                                           self._port,
+                                           commands,
+                                           timeout=self.timeout,
+                                           priv=True)
+        try:
+            out_code,resp = cmd.run(self.name)
+        except IOError:
+            module_logger.info("Bad enable password!")
+            self._enablepw = None
+            out_code = 1
+            resp="Bad enable password"
+        except Exception:
+            out_code = 1
+            resp=""
+        if out_code:
+            module_logger.error(f"Write memory had an error: {resp}")
+        else:
+            module_logger.info("Write memory complete, settings saved")
 
     def get_configuration(self):
         """
