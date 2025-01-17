@@ -38,7 +38,7 @@ class VlanWidget(QTableWidget):
                 self.set_name.emit(port.text(), new_name)
 
     def onPowerChanged(self, row, state):
-        port = self.item(row, PORTCOL)
+        port = self.item(row, self.PORTCOL)
         new_pwr = 1 if state == QtCore.Qt.Checked else 0
         if new_pwr != self._power[row]:
             self.set_power.emit(port.text(), new_pwr)
