@@ -264,6 +264,19 @@ class CommandRunner(object):
             self.exit()
             return (self.chan.recv_exit_status(), output)
         finally:
+            # If we close without this, we sometimes get SSHExceptions when
+            # trying to reconnect. Get the exit status, then read everything from
+            # the socket until it's closed or get EOF from switch - at this point
+            # the connection should be closed and we should be able to reconnect
+            try:
+                sock = self.chan.get_transport().sock
+                sock.settimeout(self.timeout)
+                f = sock.makefile("rb")
+                _ = f.read()
+            except (OSError, socket.timeout) as e:
+                # OSError - connection closed while reading from socket
+                # socket.timeout - just timeout if we block for too long
+                pass
             self.ssh.close()
 
 
