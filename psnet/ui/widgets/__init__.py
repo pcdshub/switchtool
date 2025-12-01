@@ -1,1 +1,1 @@
-__all__ = ['vlan','switch']
+__all__ = ["vlan", "switch"]

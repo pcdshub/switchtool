@@ -1,21 +1,29 @@
 #!/reg/g/pcds/pyps/conda/rhel6/envs/pcds/bin/python
 
 ###!/usr/bin/env python
-import re
-import sys
-from . import utils
-import socket
-import logging
 import argparse
-import paramiko
+import logging
+import re
+import socket
+import sys
 import telnetlib
 import time
-from paramiko.ssh_exception import SSHException
 from subprocess import CalledProcessError
-from .settings import LOG_CONF, HOST_IGNORE, DIGI_HOST_IGNORE, MOXA_HOST_IGNORE, CISCO_HOST, ARISTA_HOST
 
+import paramiko
+from paramiko.ssh_exception import SSHException
 
-LOG = logging.getLogger(LOG_CONF.get('logger_name', __name__))
+from . import utils
+from .settings import (
+    ARISTA_HOST,
+    CISCO_HOST,
+    DIGI_HOST_IGNORE,
+    HOST_IGNORE,
+    LOG_CONF,
+    MOXA_HOST_IGNORE,
+)
+
+LOG = logging.getLogger(LOG_CONF.get("logger_name", __name__))
 
 
 class TelnetCommandRunner(object):
@@ -25,26 +33,26 @@ class TelnetCommandRunner(object):
         self.port = port
         self.timeout = timeout
         self.cmds = cmds or []
-        self.tn_prompt = '#> '
-        self.lo_prompt = 'login: '
-        self.pw_prompt = 'password: '
-        self.newline_split = re.compile('\r?\n')
+        self.tn_prompt = "#> "
+        self.lo_prompt = "login: "
+        self.pw_prompt = "password: "
+        self.newline_split = re.compile("\r?\n")
         self.cmd_list = [
-            ('login: ', self.user),
-            ('password: ', self.pw),
+            ("login: ", self.user),
+            ("password: ", self.pw),
         ]
         for cmd in self.cmds:
             self.cmd_list.append((self.tn_prompt, cmd))
-            self.cmd_list.append(('%s\r\n'%cmd, None))
-        self.cmd_list.append((self.tn_prompt, 'exit'))
+            self.cmd_list.append(("%s\r\n" % cmd, None))
+        self.cmd_list.append((self.tn_prompt, "exit"))
         self.tn = telnetlib.Telnet()
 
     def run(self, host):
         """
         Runs the command on the passed list of hosts
         """
-        output = ''
-        
+        output = ""
+
         try:
             self.tn.open(host, self.port, self.timeout)
             # Container for useful telnet output
@@ -57,19 +65,32 @@ class TelnetCommandRunner(object):
                     cur_out = self.tn.read_until(prompt)
                     if keep_next_out:
                         if cur_out.endswith(prompt):
-                            cur_out = cur_out[:-len(prompt)]
+                            cur_out = cur_out[: -len(prompt)]
                         # remove trailing \r is present
-                        output += cur_out.rstrip('\r')
+                        output += cur_out.rstrip("\r")
                         keep_next_out = False
-                    self.tn.write('%s\n'%reply)
+                    self.tn.write("%s\n" % reply)
 
             return (0, output)
 
         finally:
             self.tn.close()
 
+
 class CommandRunner(object):
-    def __init__(self, user, pw, enablepw, port, cmds, prompt, terminator, timeout=None, private_key=False, priv=False):
+    def __init__(
+        self,
+        user,
+        pw,
+        enablepw,
+        port,
+        cmds,
+        prompt,
+        terminator,
+        timeout=None,
+        private_key=False,
+        priv=False,
+    ):
         self.user = user
         self.pw = pw
         self.enablepw = enablepw
@@ -78,13 +99,15 @@ class CommandRunner(object):
         self.private_key = private_key
         self.priv = priv
         self.cmds = cmds or []
-        self.page_cont_pattern = re.compile('--More--, next page: Space, next line: Return key, quit: Control-c')
+        self.page_cont_pattern = re.compile(
+            "--More--, next page: Space, next line: Return key, quit: Control-c"
+        )
         self.prompt_temp = prompt
         self.prompt_pattern = None
         self.terminator = terminator
         self.recv_buf = 8192
         self.chan = None
-        self.mode = ''
+        self.mode = ""
         self._config()
         self._rbuffer = None
         self.debug = False
@@ -98,8 +121,7 @@ class CommandRunner(object):
         pass
 
     def exit(self):
-        self.exec_cmd('exit', False)
-
+        self.exec_cmd("exit", False)
 
     """
     OK, we're running afoul of how paramiko does readline here.  It's
@@ -124,12 +146,12 @@ class CommandRunner(object):
         d = self.chan.recv(self.recv_buf)
         if d[0] == 8:
             d = d[1:]
-        while d[:3] == b' \b\b':
+        while d[:3] == b" \b\b":
             d = d[3:]
-        if d[:2] == b' \b':
+        if d[:2] == b" \b":
             d = d[2:]
         return d
-        
+
     def _readline(self):
         # If we don't have any data, try to read some!
         while self._rbuffer is None:
@@ -141,12 +163,12 @@ class CommandRunner(object):
         while True:
             # If there is a newline in our data, return the first chunk.
             try:
-                idx = self._rbuffer.index(b'\n')
-                r = self._rbuffer[0:idx+1].decode("utf-8")
+                idx = self._rbuffer.index(b"\n")
+                r = self._rbuffer[0 : idx + 1].decode("utf-8")
                 if idx == len(self._rbuffer):
                     self._rbuffer = None
                 else:
-                    self._rbuffer = self._rbuffer[idx+1:]
+                    self._rbuffer = self._rbuffer[idx + 1 :]
                 if self.debug:
                     print("<<< %s" % r)
                 return r
@@ -174,21 +196,21 @@ class CommandRunner(object):
         seen_prompt = False
         if self.debug:
             print(">>> %s\\n" % cmd)
-        self.chan.send('%s%s'%(cmd, self.terminator))
-        output = ''
-        
+        self.chan.send("%s%s" % (cmd, self.terminator))
+        output = ""
+
         while not seen_echo:
             line = self._readline()
             prompt_match = self.prompt_pattern.match(line.rstrip())
-            if prompt_match and prompt_match.group('cmd') == cmd:
-                self.mode = prompt_match.group('mode')
+            if prompt_match and prompt_match.group("cmd") == cmd:
+                self.mode = prompt_match.group("mode")
                 seen_echo = True
 
         while not seen_prompt:
             line = self._readline()
             page_cont = self.page_cont_pattern.match(line)
             if page_cont:
-                self.chan.send(' %s'%self.terminator)
+                self.chan.send(" %s" % self.terminator)
                 if self.debug:
                     print(">>> \\n")
             else:
@@ -196,11 +218,11 @@ class CommandRunner(object):
                 if self.debug and prompt_match:
                     print("prompt_match!")
                 if prompt_match:
-                    self.mode = prompt_match.group('mode')
+                    self.mode = prompt_match.group("mode")
                     seen_prompt = True
                 else:
                     output += line
-        self.chan.send(' %s'%self.terminator)
+        self.chan.send(" %s" % self.terminator)
         if keepOutput:
             return output
 
@@ -209,16 +231,22 @@ class CommandRunner(object):
         Runs the command on the passed list of hosts
         """
         # Sigh... now we want to actually see if our prompt is '>' or '#' and enable if needed!
-        self.prompt_pattern = re.compile(self.prompt_temp % (host, '(?P<mode>[#>])'))
-        output = ''
+        self.prompt_pattern = re.compile(self.prompt_temp % (host, "(?P<mode>[#>])"))
+        output = ""
 
         # The connect seems to fail a lot.  Let's see if we can catch this at all
         # and retry?
         did_connect = False
         for i in range(5):
             try:
-                self.ssh.connect(host, self.port, self.user, self.pw,
-                                 timeout=self.timeout,look_for_keys=False)
+                self.ssh.connect(
+                    host,
+                    self.port,
+                    self.user,
+                    self.pw,
+                    timeout=self.timeout,
+                    look_for_keys=False,
+                )
                 did_connect = True
                 break
             except:
@@ -240,45 +268,128 @@ class CommandRunner(object):
 
 
 class AristaCommandRunner(CommandRunner):
-    def __init__(self, user, pw, enablepw, port, cmds, timeout=None, private_key=False, priv=False):
-        super(AristaCommandRunner, self).__init__(user, pw, enablepw, port, cmds, '^%s(?:\.ARISTA)?%s(?P<cmd>.*)', '\n', timeout, private_key, priv)
+    def __init__(
+        self,
+        user,
+        pw,
+        enablepw,
+        port,
+        cmds,
+        timeout=None,
+        private_key=False,
+        priv=False,
+    ):
+        super(AristaCommandRunner, self).__init__(
+            user,
+            pw,
+            enablepw,
+            port,
+            cmds,
+            "^%s(?:\.ARISTA)?%s(?P<cmd>.*)",
+            "\n",
+            timeout,
+            private_key,
+            priv,
+        )
         self.cmds = self._fix_cmds()
 
     def _fix_cmds(self):
         new_cmds = []
         for cmd in self.cmds:
-            new_cmds.append('%s | no-more'%cmd)
+            new_cmds.append("%s | no-more" % cmd)
         return new_cmds
 
 
 class CiscoCommandRunner(CommandRunner):
-    def __init__(self, user, pw, enablepw, port, cmds, timeout=None, private_key=False, priv=False):
-        super(CiscoCommandRunner, self).__init__(user, pw, enablepw, port, cmds, '^%s%s(?P<cmd>.*)', '\n', timeout, private_key, priv)
+    def __init__(
+        self,
+        user,
+        pw,
+        enablepw,
+        port,
+        cmds,
+        timeout=None,
+        private_key=False,
+        priv=False,
+    ):
+        super(CiscoCommandRunner, self).__init__(
+            user,
+            pw,
+            enablepw,
+            port,
+            cmds,
+            "^%s%s(?P<cmd>.*)",
+            "\n",
+            timeout,
+            private_key,
+            priv,
+        )
 
     def enter(self):
-        self.exec_cmd('terminal length 0', False)
+        self.exec_cmd("terminal length 0", False)
 
 
 class BrocadeCommandRunner(CommandRunner):
-    def __init__(self, user, pw, enablepw, port, cmds, timeout=None, private_key=False, priv=False):
-        super(BrocadeCommandRunner, self).__init__(user, pw, enablepw, port, cmds, '^SSH@%s(?:\([\w-]*\))?%s(?P<cmd>.*)', '\r\n', timeout, private_key, priv)
+    def __init__(
+        self,
+        user,
+        pw,
+        enablepw,
+        port,
+        cmds,
+        timeout=None,
+        private_key=False,
+        priv=False,
+    ):
+        super(BrocadeCommandRunner, self).__init__(
+            user,
+            pw,
+            enablepw,
+            port,
+            cmds,
+            "^SSH@%s(?:\([\w-]*\))?%s(?P<cmd>.*)",
+            "\r\n",
+            timeout,
+            private_key,
+            priv,
+        )
 
     def exit(self):
-        self.chan.send('exit%s'%self.terminator)
+        self.chan.send("exit%s" % self.terminator)
         # set a timeout incase switch never responds after first exit
         self.chan.settimeout(0.25)
         try:
             if not self.chan.exit_status_ready():
-                self.chan.send('exit%s'%self.terminator)
+                self.chan.send("exit%s" % self.terminator)
         except socket.timeout:
             # if this timedout then its likely exited
             pass
 
+
 class RuckusCommandRunner(CommandRunner):
-    def __init__(self, user, pw, enablepw, port, cmds, timeout=None, private_key=False, priv=False):
-        super(RuckusCommandRunner, self).__init__(user, pw, enablepw, port, cmds, 
-                                                  '^SSH@%s(?:\([-/\w]*\))?%s(?P<cmd>.*)', '\n', 
-                                                  timeout, private_key, priv)
+    def __init__(
+        self,
+        user,
+        pw,
+        enablepw,
+        port,
+        cmds,
+        timeout=None,
+        private_key=False,
+        priv=False,
+    ):
+        super(RuckusCommandRunner, self).__init__(
+            user,
+            pw,
+            enablepw,
+            port,
+            cmds,
+            "^SSH@%s(?:\([-/\w]*\))?%s(?P<cmd>.*)",
+            "\n",
+            timeout,
+            private_key,
+            priv,
+        )
 
     def enter(self):
         # This doesn't seem to work.  If we do this, we freeze during the output.
@@ -286,61 +397,92 @@ class RuckusCommandRunner(CommandRunner):
         #
         if self.priv:
             # We do this only to get the mode.
-            self.exec_cmd('show clock')
-            if self.mode == '>':
+            self.exec_cmd("show clock")
+            if self.mode == ">":
                 self.exec_cmd("enable %s" % self.enablepw)
-                if self.mode != '#':
+                if self.mode != "#":
                     raise IOError("Bad enable password!")
 
     def exit(self):
-        self.chan.send('exit%s'%self.terminator)
+        self.chan.send("exit%s" % self.terminator)
         # set a timeout incase switch never responds after first exit
         self.chan.settimeout(0.25)
         try:
             if not self.chan.exit_status_ready():
-                self.chan.send('exit%s'%self.terminator)
+                self.chan.send("exit%s" % self.terminator)
         except socket.timeout:
             # if this timedout then its likely exited
             pass
 
+
 def parse_cli():
     # Create the parser
-    parser = argparse.ArgumentParser(description='A cli tool for running commands on Brocade, Cisco, and Arista switches or Digi PortServers/ConnectPorts.')
+    parser = argparse.ArgumentParser(
+        description="A cli tool for running commands on Brocade, Cisco, and Arista switches or Digi PortServers/ConnectPorts."
+    )
 
-    subparsers = parser.add_subparsers(help='Available device types to run commands on')
+    subparsers = parser.add_subparsers(help="Available device types to run commands on")
 
-    cisco_parser = subparsers.add_parser('cisco', help='Runs commands on Cisco switches found in netconfig')
-    cisco_parser.set_defaults(dev='switches', func=utils.get_switch_list, cmd_run=CiscoCommandRunner, ignore=HOST_IGNORE, subset=CISCO_HOST)
+    cisco_parser = subparsers.add_parser(
+        "cisco", help="Runs commands on Cisco switches found in netconfig"
+    )
+    cisco_parser.set_defaults(
+        dev="switches",
+        func=utils.get_switch_list,
+        cmd_run=CiscoCommandRunner,
+        ignore=HOST_IGNORE,
+        subset=CISCO_HOST,
+    )
 
-    cisco_parser.add_argument('cmds',
-                               metavar='CMD',
-                               nargs='+',
-                               help='The commands to run on the switches')
+    cisco_parser.add_argument(
+        "cmds", metavar="CMD", nargs="+", help="The commands to run on the switches"
+    )
 
-    brocade_parser = subparsers.add_parser('brocade', help='Runs commands on Brocade switches found in netconfig')
-    brocade_parser.set_defaults(dev='switches', func=utils.get_switch_list, cmd_run=BrocadeCommandRunner, ignore=HOST_IGNORE, subset=None)
+    brocade_parser = subparsers.add_parser(
+        "brocade", help="Runs commands on Brocade switches found in netconfig"
+    )
+    brocade_parser.set_defaults(
+        dev="switches",
+        func=utils.get_switch_list,
+        cmd_run=BrocadeCommandRunner,
+        ignore=HOST_IGNORE,
+        subset=None,
+    )
 
-    brocade_parser.add_argument('cmds',
-                               metavar='CMD',
-                               nargs='+',
-                               help='The commands to run on the switches')
+    brocade_parser.add_argument(
+        "cmds", metavar="CMD", nargs="+", help="The commands to run on the switches"
+    )
 
-    arista_parser = subparsers.add_parser('arista', help='Runs commands on Arista switches found in netconfig')
-    arista_parser.set_defaults(dev='switches', func=utils.get_switch_list, cmd_run=AristaCommandRunner, ignore=HOST_IGNORE, subset=ARISTA_HOST)
+    arista_parser = subparsers.add_parser(
+        "arista", help="Runs commands on Arista switches found in netconfig"
+    )
+    arista_parser.set_defaults(
+        dev="switches",
+        func=utils.get_switch_list,
+        cmd_run=AristaCommandRunner,
+        ignore=HOST_IGNORE,
+        subset=ARISTA_HOST,
+    )
 
-    arista_parser.add_argument('cmds',
-                               metavar='CMD',
-                               nargs='+',
-                               help='The commands to run on the switches')
+    arista_parser.add_argument(
+        "cmds", metavar="CMD", nargs="+", help="The commands to run on the switches"
+    )
 
-    digi_parser = subparsers.add_parser('digi', help='Runs commands on digi portservers or connectports found in netconfig')
-    digi_parser.set_defaults(dev='digi portservers', func=utils.get_digi_list, cmd_run=TelnetCommandRunner, ignore=DIGI_HOST_IGNORE, subset=None)
+    digi_parser = subparsers.add_parser(
+        "digi",
+        help="Runs commands on digi portservers or connectports found in netconfig",
+    )
+    digi_parser.set_defaults(
+        dev="digi portservers",
+        func=utils.get_digi_list,
+        cmd_run=TelnetCommandRunner,
+        ignore=DIGI_HOST_IGNORE,
+        subset=None,
+    )
 
-    digi_parser.add_argument('cmds',
-                             metavar='CMD',
-                             nargs='+',
-                             help='The commands to run on the digis')
-
+    digi_parser.add_argument(
+        "cmds", metavar="CMD", nargs="+", help="The commands to run on the digis"
+    )
 
     # Add the default telnet options
     utils.add_telnet_opts(digi_parser)
@@ -365,29 +507,45 @@ def main():
     LOG.setLevel(utils.log_level_parse(args.log))
 
     # create the command runner
-    LOG.debug('Creating command runner with user: %s, pswd: %s, port: %s, cmds: %s',
-              args.user,
-              args.pswd,
-              args.port,
-              ', '.join(args.cmds))
+    LOG.debug(
+        "Creating command runner with user: %s, pswd: %s, port: %s, cmds: %s",
+        args.user,
+        args.pswd,
+        args.port,
+        ", ".join(args.cmds),
+    )
 
-    if hasattr(args,'private_key'):
-        cmd_run = args.cmd_run(args.user, passwd, args.port, args.cmds, timeout=args.timeout, private_key=args.private_key)
+    if hasattr(args, "private_key"):
+        cmd_run = args.cmd_run(
+            args.user,
+            passwd,
+            args.port,
+            args.cmds,
+            timeout=args.timeout,
+            private_key=args.private_key,
+        )
     else:
-        cmd_run = args.cmd_run(args.user, passwd, args.port, args.cmds, timeout=args.timeout)
+        cmd_run = args.cmd_run(
+            args.user, passwd, args.port, args.cmds, timeout=args.timeout
+        )
 
     # if no hosts are specified try to get a list from netconfig
     if args.hosts is None:
         try:
-            LOG.info('Attempting to retrieve a list of %s from netconfig:', args.dev)
+            LOG.info("Attempting to retrieve a list of %s from netconfig:", args.dev)
             devices = args.func()
         except (OSError, CalledProcessError) as err:
-            LOG.critical('Problem running netconfig: %s', err)
+            LOG.critical("Problem running netconfig: %s", err)
             return 1
-        good_devices = [ sw for sw in devices if sw not in args.ignore ]
+        good_devices = [sw for sw in devices if sw not in args.ignore]
         num_sw = len(devices)
         num_sw_good = len(good_devices)
-        LOG.info('Found %d %s via netconfig, %d of which are in the ignore list', num_sw, args.dev, num_sw - num_sw_good)
+        LOG.info(
+            "Found %d %s via netconfig, %d of which are in the ignore list",
+            num_sw,
+            args.dev,
+            num_sw - num_sw_good,
+        )
     else:
         good_devices = args.hosts
         num_sw_good = len(good_devices)
@@ -398,33 +556,42 @@ def main():
     for host in good_devices:
         try:
             if args.subset is None or host in args.subset:
-                LOG.info('Running command(s) %s on %s', ', '.join(args.cmds), host)
+                LOG.info("Running command(s) %s on %s", ", ".join(args.cmds), host)
                 status_code, output = cmd_run.run(host)
                 if status_code == 0:
                     sys.stdout.write(output)
                     sys.stdout.flush()
                 else:
-                    LOG.warn('Commands returned non-zero status code')
+                    LOG.warn("Commands returned non-zero status code")
                     sys.stderr.write(output)
                     sys.stderr.flush()
             else:
-                LOG.warning('Not running command(s) %s on %s since device type does not match', ', '.join(args.cmds), host)
+                LOG.warning(
+                    "Not running command(s) %s on %s since device type does not match",
+                    ", ".join(args.cmds),
+                    host,
+                )
         except (SSHException, socket.error) as err:
-            fails +=1
+            fails += 1
             failed_hosts.append(host)
-            LOG.error('Failure connecting to %s: %s', host, err)
-            LOG.error('Skipping running command on %s', host)
+            LOG.error("Failure connecting to %s: %s", host, err)
+            LOG.error("Skipping running command on %s", host)
 
     if fails != 0:
-        LOG.error('Running of the commands failed on %d of %d %s', fails, num_sw_good, args.dev)
-        LOG.error('%s with failures: %s', args.dev.capitalize(), failed_hosts)
+        LOG.error(
+            "Running of the commands failed on %d of %d %s",
+            fails,
+            num_sw_good,
+            args.dev,
+        )
+        LOG.error("%s with failures: %s", args.dev.capitalize(), failed_hosts)
         return 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     try:
         # set the root logger since this is an entry point
-        utils.log_init('%(levelname)s:%(message)s')
+        utils.log_init("%(levelname)s:%(message)s")
         sys.exit(main())
     except KeyboardInterrupt:
         sys.exit(1)

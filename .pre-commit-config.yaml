@@ -28,8 +28,3 @@ repos:
   - id: ruff  # run the linter
     args: [ --fix, --select, I ]  # --select I sorts imports
   - id: ruff-format  # run the formatter
-
-- repo: https://github.com/timothycrosley/isort
-  rev: 6.0.1
-  hooks:
-  - id: isort
