@@ -14,6 +14,7 @@ module_logger = logging.getLogger(__name__)
 switch_types = {
     'arista'     : survey.AristaSurveyer,
     'brocade'    : survey.BrocadeSurveyer,
+    'foundry'    : survey.BrocadeSurveyer, # foundry acquired by brocade
     'ruckus'     : survey.RuckusSurveyer,
     'cisco'      : survey.CiscoSurveyer,
 }

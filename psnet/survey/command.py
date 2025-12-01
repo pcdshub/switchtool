@@ -260,8 +260,8 @@ class CiscoCommandRunner(CommandRunner):
 
 
 class BrocadeCommandRunner(CommandRunner):
-    def __init__(self, user, pw, enablepw, port, cmds, timeout=None):
-        super(BrocadeCommandRunner, self).__init__(user, pw, enablepw, port, cmds, '^SSH@%s(?:\([\w-]*\))?%s(?P<cmd>.*)', '\r\n', timeout)
+    def __init__(self, user, pw, enablepw, port, cmds, timeout=None, private_key=False, priv=False):
+        super(BrocadeCommandRunner, self).__init__(user, pw, enablepw, port, cmds, '^SSH@%s(?:\([\w-]*\))?%s(?P<cmd>.*)', '\r\n', timeout, private_key, priv)
 
     def exit(self):
         self.chan.send('exit%s'%self.terminator)
