@@ -1,0 +1,39 @@
+{% set package_name = "switchtool" %}
+{% set import_name = "psnet" %}
+{% set version = load_file_regex(load_file=os.path.join(import_name, "_version.py"), regex_pattern=".*version = '(\S+)'").group(1) %}
+
+package:
+  name: {{ package_name }}
+  version : {{ version }}
+
+source:
+  path: ..
+
+build:
+  number: 0
+  noarch: python
+  script: {{ PYTHON }} -m pip install . -vv
+
+requirements:
+  build:
+    - python >=3.9
+    - pip
+    - setuptools_scm
+  run:
+    - python >=3.9
+    - paramiko >=2.11.0
+    - PyQt5 >=5.15.11
+    - simplejson >=3.17.6
+
+test:
+  requires:
+    - pytest
+    - pytest-timeout
+    - typhos
+  imports:
+    - {{ import_name }}
+
+about:
+  home: https://github.com/pcdshub/switchtool
+  license: SLAC Open License
+  summary: Interact with and program switches over python

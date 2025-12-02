@@ -1,6 +1,8 @@
-from PyQt5 import QtGui,QtCore,QtWidgets
-from PyQt5.QtCore import pyqtSignal
 import functools
+
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import pyqtSignal
+
 
 class FindDialog(QtWidgets.QDialog):
     closing = pyqtSignal()
@@ -9,8 +11,9 @@ class FindDialog(QtWidgets.QDialog):
     """
     Dialog to find a particular device.
     """
-    def __init__(self,device,dvplist,parent=None):
-        super(FindDialog,self).__init__(parent)
+
+    def __init__(self, device, dvplist, parent=None):
+        super(FindDialog, self).__init__(parent)
         self.device = device
         self.setModal(False)
         self.setWindowTitle('Find Device "%s"' % device)
@@ -30,7 +33,7 @@ class FindDialog(QtWidgets.QDialog):
         # Create a widget for the scroll area and limit its size.
         # Resize events for this widget will be sent to us.
         self.sw = QtWidgets.QWidget(self.sa)
-        self.sw.setMaximumHeight((len(dvplist)+1)*20)
+        self.sw.setMaximumHeight((len(dvplist) + 1) * 20)
         self.sw.installEventFilter(self)
         self.sa.setWidget(self.sw)
 
@@ -39,15 +42,19 @@ class FindDialog(QtWidgets.QDialog):
 
         self.layout.addWidget(self.sa)
 
-        for (d,v,p) in dvplist:
+        for d, v, p in dvplist:
             b = QtWidgets.QRadioButton(self)
             b.setMinimumSize(100, 20)
-            b.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding,
-                                                  QtWidgets.QSizePolicy.MinimumExpanding))
+            b.setSizePolicy(
+                QtWidgets.QSizePolicy(
+                    QtWidgets.QSizePolicy.MinimumExpanding,
+                    QtWidgets.QSizePolicy.MinimumExpanding,
+                )
+            )
             b.setChecked(False)
             b.setText(d)
             self.clayout.addWidget(b)
-            b.vp = (v,p)
+            b.vp = (v, p)
             b.toggled.connect(functools.partial(self.toggled, b))
 
         self.buttonBox = QtWidgets.QDialogButtonBox(self)
@@ -63,11 +70,12 @@ class FindDialog(QtWidgets.QDialog):
     def closeEvent(self, event):
         self.closing.emit()
         self.sw.removeEventFilter(self)
-        super(FindDialog,self).closeEvent(event)
+        super(FindDialog, self).closeEvent(event)
 
     # This is called when we are acting as an eventFilter for the scroll widget.
     def eventFilter(self, o, e):
         if o == self.sw and e.type() == QtCore.QEvent.Resize:
-            self.setMinimumWidth(self.sw.minimumSizeHint().width() +
-                                 self.sa.verticalScrollBar().width())
+            self.setMinimumWidth(
+                self.sw.minimumSizeHint().width() + self.sa.verticalScrollBar().width()
+            )
         return False

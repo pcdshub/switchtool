@@ -1,29 +1,30 @@
-import sys
-import logging
-from PyQt5 import QtGui,QtCore,QtWidgets
-from PyQt5.QtCore import pyqtSlot,pyqtSignal,QTimer,QSettings
 import functools
+import logging
+import sys
 
-from .vlan import VlanWidget
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import QSettings, QTimer, pyqtSignal, pyqtSlot
+
 from ...EpicsQT.qlogdisplay import QLogDisplay
-from .. import dialogs
 from ...switch.switch import Switch
+from .. import dialogs
+from .vlan import VlanWidget
+
 
 class SwitchWidget(QtWidgets.QWidget):
-    
     _vlan = {}
-    
+
     misplaced = pyqtSignal(str)
-    updated   = pyqtSignal()
+    updated = pyqtSignal()
     update_port = pyqtSignal(str, str, str, str, str, str)
 
-    def __init__(self,switch,user=None,pw=None,timeout=1.0,parent=None):
-        super(SwitchWidget,self).__init__(parent=parent)
-        self.resize(660,700)
+    def __init__(self, switch, user=None, pw=None, timeout=1.0, parent=None):
+        super(SwitchWidget, self).__init__(parent=parent)
+        self.resize(660, 700)
 
         self._switch = None
         self.switch_name = switch.split(".")[0]
-        self.refresh_timeout = timeout * 3600000 # Now ms!
+        self.refresh_timeout = timeout * 3600000  # Now ms!
 
         self.settings = QSettings("SLAC", "switchtool")
         self.switch_label = QtWidgets.QLabel(switch)
@@ -32,39 +33,39 @@ class SwitchWidget(QtWidgets.QWidget):
         title_font.setBold(True)
         self.switch_label.setFont(title_font)
 
-        self._vlanTab     = QtWidgets.QTabWidget(parent=self)
+        self._vlanTab = QtWidgets.QTabWidget(parent=self)
         self._vlanTab.setMovable(True)
         self._vlanTab.tabBar().tabMoved.connect(self.tabMoved)
         self._vlanList = None
-        
-        #Log Handler
-        self.switch_log = logging.getLogger('psnet.switch')
+
+        # Log Handler
+        self.switch_log = logging.getLogger("psnet.switch")
         self.log = QLogDisplay()
-        self.log.addLog(self.switch_log,level=logging.INFO)
-        
-        #Move  Layout
-        self.utilities = QtWidgets.QGroupBox('Utilities')
-        self.refresh_button = QtWidgets.QPushButton('Refresh')
+        self.log.addLog(self.switch_log, level=logging.INFO)
+
+        # Move  Layout
+        self.utilities = QtWidgets.QGroupBox("Utilities")
+        self.refresh_button = QtWidgets.QPushButton("Refresh")
         self.refresh_button.clicked.connect(self.do_update)
-        self.survey_button = QtWidgets.QPushButton('Survey')
+        self.survey_button = QtWidgets.QPushButton("Survey")
         self.survey_button.clicked.connect(self.survey)
-        self.move_button = QtWidgets.QPushButton('Move Port')
+        self.move_button = QtWidgets.QPushButton("Move Port")
         self.move_button.clicked.connect(self.move_port)
-        self.configure_button = QtWidgets.QPushButton('Auto Configure')
+        self.configure_button = QtWidgets.QPushButton("Auto Configure")
         self.configure_button.clicked.connect(self.auto_configure)
-        self.write_memory_button = QtWidgets.QPushButton('Write Memory')
+        self.write_memory_button = QtWidgets.QPushButton("Write Memory")
         self.write_memory_button.clicked.connect(self.write_memory)
-        
+
         self.move_layout = QtWidgets.QHBoxLayout()
         self.move_layout.addWidget(self.refresh_button)
         self.move_layout.addWidget(self.survey_button)
         self.move_layout.addWidget(self.move_button)
         self.move_layout.addWidget(self.configure_button)
         self.move_layout.addWidget(self.write_memory_button)
-        
+
         self.utilities.setLayout(self.move_layout)
 
-        #Search Layout 
+        # Search Layout
         self.portCombo = QtWidgets.QComboBox()
         self.portCombo.activated[str].connect(self.find_port)
         self.deviceCombo = QtWidgets.QComboBox()
@@ -73,22 +74,21 @@ class SwitchWidget(QtWidgets.QWidget):
         self.deviceLine = QtWidgets.QLineEdit()
         self.deviceCombo.setFixedWidth(200)
         self.deviceLine.returnPressed.connect(self.dlreturn)
-        
+
         self.search_layout = QtWidgets.QHBoxLayout()
         self.search_layout.addStretch(2)
-        self.search_layout.addWidget(QtWidgets.QLabel('Find Port: '))
+        self.search_layout.addWidget(QtWidgets.QLabel("Find Port: "))
         self.search_layout.addWidget(self.portCombo)
         self.search_layout.addStretch(1)
-        self.search_layout.addWidget(QtWidgets.QLabel('Find Device: '))
+        self.search_layout.addWidget(QtWidgets.QLabel("Find Device: "))
         self.search_layout.addWidget(self.deviceCombo)
         self.search_layout.addStretch(1)
         self.search_layout.addWidget(self.deviceLine)
         self.search_layout.addStretch(2)
-        
-        #Overall Layout
+
+        # Overall Layout
         self.lay = QtWidgets.QVBoxLayout()
-        self.lay.addWidget(self.switch_label,
-                           alignment=QtCore.Qt.AlignCenter)
+        self.lay.addWidget(self.switch_label, alignment=QtCore.Qt.AlignCenter)
         self.lay.addWidget(self.log)
         self.lay.addWidget(self.utilities)
         self.lay.addLayout(self.search_layout)
@@ -99,10 +99,10 @@ class SwitchWidget(QtWidgets.QWidget):
         self.timer = QTimer()
         self.timer.timeout.connect(self.need_refresh)
         self.repaint()
-        QTimer.singleShot(100, functools.partial(self.initial_update, switch, user, pw));
-        
+        QTimer.singleShot(100, functools.partial(self.initial_update, switch, user, pw))
+
     def initial_update(self, switch, user, pw):
-        self._switch = PyQtSwitch(switch,user=user,pw=pw,enablepw=None,parent=self)
+        self._switch = PyQtSwitch(switch, user=user, pw=pw, enablepw=None, parent=self)
         self.updated.connect(self.refresh)
         self.update_port.connect(self.refresh_port)
         self._switch.update()
@@ -122,20 +122,20 @@ class SwitchWidget(QtWidgets.QWidget):
         self.switch_log.warning("Timer expired: Refresh recommended!!")
 
     @pyqtSlot(str)
-    def find_device(self,device):
+    def find_device(self, device):
         """
         Find a device on the switch and select it
         """
         device = str(device)
-        vlan,port = self._switch.find_device(device)
+        vlan, port = self._switch.find_device(device)
         if vlan and port:
-            self.select_vlan(vlan,port=port)
+            self.select_vlan(vlan, port=port)
 
     """
     The finddialog is a nonmodal dialog!  So dlreturn just creates and shows it.
-    
+
     If there is already one open, we close it.
-    
+
     If the dialog accepts (clicks OK), we close it here.
     If it closes, we forget about it.
     """
@@ -148,11 +148,15 @@ class SwitchWidget(QtWidgets.QWidget):
         l = self._switch.find_device_substr(device)
         ll = len(l)
         if ll == 0:
-            QtWidgets.QMessageBox.critical(None,
-                                           "Warning", "No matches for '%s'!" % device,
-                                           QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.Ok)
+            QtWidgets.QMessageBox.critical(
+                None,
+                "Warning",
+                "No matches for '%s'!" % device,
+                QtWidgets.QMessageBox.Ok,
+                QtWidgets.QMessageBox.Ok,
+            )
         elif ll == 1:
-            self.select_vlan(l[0][1],port=l[0][2])
+            self.select_vlan(l[0][1], port=l[0][2])
         else:
             self.finddialog = dialogs.FindDialog(device, l, parent=self)
             self.finddialog.accepted.connect(self.FDaccept)
@@ -174,14 +178,14 @@ class SwitchWidget(QtWidgets.QWidget):
         self.select_vlan(vlan, port)
 
     @pyqtSlot(str)
-    def find_port(self,port):
+    def find_port(self, port):
         """
         Find a port on the switch and select it
         """
         port = str(port)
         vlan = self._switch.find_port(port)
         if vlan:
-            self.select_vlan(vlan,port=port)
+            self.select_vlan(vlan, port=port)
 
     @pyqtSlot(int, int)
     def tabMoved(self, start, dest):
@@ -216,15 +220,19 @@ class SwitchWidget(QtWidgets.QWidget):
         alltabs = {}
         allsubs = {}
         allvlan = {}
-        
+
         switch = VlanWidget(parent=self)
         self._complete = switch
         switch.set_power.connect(self.do_set_power)
         switch.set_name.connect(self.do_set_name)
         self.misplaced.connect(switch.highlight_device)
         plist = self._switch.ports
-        switch.add_ports(plist, self._switch.find_vlans(plist),
-                         self._switch.power(), self._switch.labels())
+        switch.add_ports(
+            plist,
+            self._switch.find_vlans(plist),
+            self._switch.power(),
+            self._switch.labels(),
+        )
         d = self._switch.devices
         switch.add_devices(d)
         c = QtWidgets.QCompleter(d)
@@ -233,14 +241,13 @@ class SwitchWidget(QtWidgets.QWidget):
         self.deviceLine.setCompleter(c)
         switch.add_unknown(self._switch.unknown_devices)
         switch.resize(switch.maximumSize())
-        alltabs[-1] = (switch,'Complete Switch')
+        alltabs[-1] = (switch, "Complete Switch")
         allsubs["All"] = -1
         allvlan[-1] = "All"
 
-        for vlan_no,subnet  in self._switch.subnets:
-            tab = 'VLAN {:} - {:}'.format(vlan_no,subnet)
-            vlan = getattr(self._switch,
-                           self._switch._vlan_alias.format(vlan_no))
+        for vlan_no, subnet in self._switch.subnets:
+            tab = "VLAN {:} - {:}".format(vlan_no, subnet)
+            vlan = getattr(self._switch, self._switch._vlan_alias.format(vlan_no))
             vlan_table = VlanWidget(parent=self)
             vlan_table.set_power.connect(self.do_set_power)
             vlan_table.set_name.connect(self.do_set_name)
@@ -248,8 +255,12 @@ class SwitchWidget(QtWidgets.QWidget):
             self._vlan[vlan_no] = vlan_table
 
             plist = vlan.ports
-            vlan_table.add_ports(plist, self._switch.find_vlans(plist),
-                                 self._switch.power(), self._switch.labels())
+            vlan_table.add_ports(
+                plist,
+                self._switch.find_vlans(plist),
+                self._switch.power(),
+                self._switch.labels(),
+            )
             vlan_table.add_devices(vlan._devices)
             vlan_table.add_unknown(vlan._unknown)
             vlan_table.resize(vlan_table.maximumSize())
@@ -302,13 +313,13 @@ class SwitchWidget(QtWidgets.QWidget):
                 if sub in allsubs.keys():
                     vl.append(allsubs[sub])
                 for v in vlist:
-                    if v not in vl and allvlan[v][:3] == 'cds':
+                    if v not in vl and allvlan[v][:3] == "cds":
                         vl.append(v)
                 for v in vlist:
-                    if v not in vl and allvlan[v][:3] == 'fez':
+                    if v not in vl and allvlan[v][:3] == "fez":
                         vl.append(v)
-                self._vlanList = vl    
-            
+                self._vlanList = vl
+
         # Now, go through the prefered vlan list order.  Add the
         # vlans that exist on this switch in this order, and then
         # append the vlans on the switch not in this list in numeric
@@ -324,18 +335,18 @@ class SwitchWidget(QtWidgets.QWidget):
 
         for k in self._vlanList:
             (vlan_table, tab) = alltabs[k]
-            self._vlanTab.addTab(vlan_table,tab)
+            self._vlanTab.addTab(vlan_table, tab)
         self._vlanTab.tabBar().setCurrentIndex(curtab)
 
         devices = []
-        ports   = []
+        ports = []
 
         for vlan in self._switch._vlan:
             for device in vlan.devices:
                 devices.append(device)
             for port in vlan.ports:
                 ports.append(port)
-        
+
         self.portCombo.addItems(sorted(ports))
         self.deviceCombo.addItems(sorted(devices))
 
@@ -347,7 +358,7 @@ class SwitchWidget(QtWidgets.QWidget):
         self._complete.refresh_port(port, mac, name, dname, pwr)
         self._vlan[vlan].refresh_port(port, mac, name, dname, pwr)
 
-    def select_vlan(self,vlan_no,port=None):
+    def select_vlan(self, vlan_no, port=None):
         """
         Select a VLAN in the tab
         """
@@ -357,40 +368,36 @@ class SwitchWidget(QtWidgets.QWidget):
             if port:
                 self._vlanTab.currentWidget().select_port(port)
 
-
     def move_port(self):
         """
         Launch Dialog to move port
         """
 
-        dialog  = dialogs.MoveDialog(self._switch.ports,
-                                     self._switch.devices,
-                                     self._switch.subnets,
-                                     parent=self) 
+        dialog = dialogs.MoveDialog(
+            self._switch.ports, self._switch.devices, self._switch.subnets, parent=self
+        )
         if dialog.exec_():
-            port,vlan = dialog.current_move()
-            self._switch.move_port(port,vlan)
+            port, vlan = dialog.current_move()
+            self._switch.move_port(port, vlan)
 
-    
-    def auto_configure(self): 
+    def auto_configure(self):
         """
         Launch the Auto-Configuration dialog
         """
         devices = self._switch.survey()
-        
 
         if devices:
-            ports   = [self._switch.find_device(dev)[1] for dev in devices]
+            ports = [self._switch.find_device(dev)[1] for dev in devices]
             subnets = [self._switch.find_subnet_for_host(dev)[1] for dev in devices]
-            devices = zip(devices,ports,subnets)
-        
-        dialog = dialogs.ConfigureDialog(devices,parent=self)
+            devices = zip(devices, ports, subnets)
+
+        dialog = dialogs.ConfigureDialog(devices, parent=self)
 
         if dialog.exec_():
             approved = dialog.approved_moves
             for move in approved:
-                device,port,subnet = move
-                self._switch.move_device(device,subnet=subnet)
+                device, port, subnet = move
+                self._switch.move_device(device, subnet=subnet)
 
     def write_memory(self):
         """
@@ -400,15 +407,17 @@ class SwitchWidget(QtWidgets.QWidget):
 
 
 class PyQtSwitch(Switch):
-    def __init__(self,switchname,user='admin',pw=None,enablepw=None,parent=None):
+    def __init__(self, switchname, user="admin", pw=None, enablepw=None, parent=None):
         self.parent = parent
-        super(PyQtSwitch,self).__init__(switchname,user=user,pw=pw,enablepw=enablepw)
-        
+        super(PyQtSwitch, self).__init__(
+            switchname, user=user, pw=pw, enablepw=enablepw
+        )
+
     def update(self):
         """
         Update switch configuration and emit signal
         """
-        super(PyQtSwitch,self).update()
+        super(PyQtSwitch, self).update()
         if self.parent:
             self.parent.updated.emit()
 
