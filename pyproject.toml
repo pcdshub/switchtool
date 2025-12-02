@@ -20,7 +20,8 @@ name = "SLAC National Accelerator Laboratory"
 [project.license]
 file = "LICENSE.md"
 
-[project.scripts]
+[project.gui-scripts]
+switchtool-gui = "scripts.switch_gui:main"
 
 [tool.setuptools.packages.find]
 where = [ ".",]

@@ -57,16 +57,18 @@ class NetConfig(object):
 
         module_logger.info("Succesfully loaded NetConfig information")
 
-        if infer_location:  # This still needs to be worked on
-            for node, info in self._nodes.items():  # I will probably wait until the
+        # This still needs to be worked on. I will probably wait until the
+        # the time comes to integrate PyQT Rack Profiles into the home screen.
+        if infer_location:
+            for node, info in self._nodes.items():
                 for attr in [
                     "name",
                     "alias",
-                    "description",  # the time comes to integrate PyQT
+                    "description",
                     "cnames",
                     "subnet",
                     "location",
-                ]:  # Rack Profiles into the home screen
+                ]:
                     if attr == "cnames":
                         search_func = parsing.parse_cname
                     else:
