@@ -39,7 +39,7 @@ class SwitchWidget(QtWidgets.QWidget):
         self._vlanList = None
 
         # Log Handler
-        self.switch_log = logging.getLogger("psnet.switch")
+        self.switch_log = logging.getLogger("switchtool.switch")
         self.log = QLogDisplay()
         self.log.addLog(self.switch_log, level=logging.INFO)
 

@@ -20,12 +20,9 @@ name = "SLAC National Accelerator Laboratory"
 [project.license]
 file = "LICENSE.md"
 
-[project.gui-scripts]
-switchtool-gui = "scripts.switch_gui:main"
-
 [tool.setuptools.packages.find]
 where = [ ".",]
-include = [ "psnet*", ]
+include = [ "switchtool*", ]
 namespaces = false
 
 [tool.setuptools.dynamic.readme]

@@ -5,7 +5,7 @@ from os import path
 
 from PyQt5.QtWidgets import QApplication
 
-import psnet.ui as switch_ui
+import switchtool.ui as switch_ui
 
 """
 Launch Switch GUI
@@ -54,7 +54,7 @@ def main():
         print("Use --switch argument to provide switch name")
         return None
 
-    log = logging.getLogger("psnet.switch")
+    log = logging.getLogger("switchtool.switch")
     stream = logging.StreamHandler()
     stream.setLevel(max(0, logging.WARNING - 10 * kwargs["verbose"]))
     log.addHandler(stream)
