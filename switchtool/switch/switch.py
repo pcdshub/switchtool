@@ -8,7 +8,6 @@ import simplejson
 
 from ..netconfig import netconfig
 from ..survey import survey
-from ..ui import dialogs
 
 module_logger = logging.getLogger(__name__)
 
@@ -118,12 +117,7 @@ class Switch(netconfig.host.Host):
         if user:
             self._user = user
 
-        if not pw:
-            self._pw = dialogs.passwddialog.getPassword(
-                "Password for {:}: ".format(self._user)
-            )
-        else:
-            self._pw = pw
+        self._pw = pw
         self._enablepw = enablepw
 
     @property
@@ -161,10 +155,7 @@ class Switch(netconfig.host.Host):
         return self._power
 
     def get_enablepw(self):
-        module_logger.info("Prompting for enable password")
-        self._enablepw = dialogs.passwddialog.getPassword(
-            "Enable password for {:}: ".format(self._user)
-        )
+        pass
 
     def set_power(self, port, state):
         # This is a privileged command: do we need/have the enable password?

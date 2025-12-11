@@ -409,6 +409,10 @@ class SwitchWidget(QtWidgets.QWidget):
 class PyQtSwitch(Switch):
     def __init__(self, switchname, user="admin", pw=None, enablepw=None, parent=None):
         self.parent = parent
+        if not pw:
+            self._pw = dialogs.passwddialog.getPassword(
+                "Password for {:}: ".format(self._user)
+            )
         super(PyQtSwitch, self).__init__(
             switchname, user=user, pw=pw, enablepw=enablepw
         )
@@ -424,3 +428,9 @@ class PyQtSwitch(Switch):
     def update_port_gui(self, port, vlan, mac, name, dname, pwr):
         if self.parent:
             self.parent.update_port.emit(port, vlan, mac, name, dname, pwr)
+
+    def get_enablepw(self):
+        self.switch_log.info("Prompting for enable password")
+        self._enablepw = dialogs.passwddialog.getPassword(
+            "Enable password for {:}: ".format(self._user)
+        )
