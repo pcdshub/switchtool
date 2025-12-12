@@ -1,0 +1,38 @@
+{% set package_name = "switchtool" %}
+{% set import_name = "switchtool" %}
+{% set version = load_file_regex(load_file=os.path.join(import_name, "_version.py"), regex_pattern=".*version = '(\S+)'").group(1) %}
+
+package:
+  name: {{ package_name }}
+  version : {{ version }}
+
+source:
+  path: ..
+
+build:
+  number: 0
+  noarch: python
+  script: {{ PYTHON }} -m pip install . -vv
+
+requirements:
+  build:
+    - python
+    - pip
+    - setuptools_scm
+  run:
+    - python
+    - paramiko
+    - PyQt5
+    - simplejson
+
+test:
+  requires:
+    - pytest
+    - pytest-timeout
+  imports:
+    - {{ import_name }}
+
+about:
+  home: https://github.com/pcdshub/switchtool
+  license: SLAC Open License
+  summary: Interact with and program switches over python
