@@ -13,8 +13,8 @@ LOG = logging.getLogger(LOG_CONF.get("logger_name", __name__))
 
 
 # Mac matching regex
-__HOST_REGEX = re.compile("^(?P<host>\S*):$")
-__MAC_REGEX = re.compile("^\s*Ethernet Address: (?P<mac>\S*)$")
+__HOST_REGEX = re.compile(r"^(?P<host>\S*):$")
+__MAC_REGEX = re.compile(r"^\s*Ethernet Address: (?P<mac>\S*)$")
 
 
 def convert_eth(ethernet):
