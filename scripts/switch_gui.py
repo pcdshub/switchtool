@@ -1,11 +1,11 @@
 import argparse
 import logging
 import sys
-from os import path
 
 from PyQt5.QtWidgets import QApplication
 
 import switchtool.ui as switch_ui
+from switchtool.switch.switch import switch_types
 
 """
 Launch Switch GUI
@@ -16,8 +16,8 @@ CRED_FILE = "/cds/group/pcds/pyps/config/switchtool.cfg"
 def read_creds():
     d = {}
     with open(CRED_FILE) as f:
-        for l in f.readlines():
-            ll = [x.strip() for x in l.split("=")]
+        for line in f.readlines():
+            ll = [x.strip() for x in line.split("=")]
             d[ll[0]] = ll[1]
     return d
 
@@ -28,6 +28,13 @@ def main():
 
     parser.add_argument(
         "-s", "--switch", type=str, help="Name of switch", required=True
+    )
+    parser.add_argument(
+        "--switch-type",
+        type=str,
+        help="Specify a switch model for when it cannot be determined automatically.",
+        choices=list(switch_types),
+        default=None,
     )
 
     parser.add_argument("-u", "--user", type=str, help="Username for switch login")
@@ -73,7 +80,11 @@ def main():
         creds["password"] = pw
 
     widget = switch_ui.SwitchWidget(
-        kwargs["switch"], user=creds["username"], pw=creds["password"], timeout=tout
+        kwargs["switch"],
+        user=creds["username"],
+        pw=creds["password"],
+        timeout=tout,
+        switch_type=kwargs["switch_type"],
     )
     widget.setWindowTitle(kwargs["switch"])
     widget.show()
