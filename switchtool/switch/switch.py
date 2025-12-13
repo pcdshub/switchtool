@@ -252,7 +252,7 @@ class Switch:
     def unknown_devices(self):
         """
         Return a dictionary of all of the devices on the switch who are not
-        associated with an entry in NetConfig
+        associated with an entry in sdfconfig
 
         Each device has a sub-dictionary that returns the VLAN number,
         mac-address and port of the device
@@ -292,7 +292,7 @@ class Switch:
 
         module_logger.info("Requesting mac addresses from switch")
         mac = self._surveyer().show_mac(self.name)
-        module_logger.info("Searching for mac addresses in NetConfig")
+        module_logger.info("Searching for mac addresses in sdfconfig")
         for port, address in mac.items():
             module_logger.debug("Found {:} on port {:}.".format(port, address))
             vlan_no = self.find_port(port)
@@ -314,7 +314,7 @@ class Switch:
                     }
                 except KeyError:
                     module_logger.debug(
-                        "Unable to find NetConfig entry for {:} on port {:}".format(
+                        "Unable to find sdfconfig entry for {:} on port {:}".format(
                             address, port
                         )
                     )
@@ -371,7 +371,7 @@ class Switch:
                     }
                 except KeyError:
                     module_logger.debug(
-                        "Unable to find NetConfig entry for {:} on port {:}".format(
+                        "Unable to find sdfconfig entry for {:} on port {:}".format(
                             address, port
                         )
                     )
@@ -411,7 +411,7 @@ class Switch:
 
     def find_device(self, device):
         """
-        Find a device on the switch by its NetConfig name
+        Find a device on the switch by its sdfconfig name
 
         :param device: The name of the device
         :type  device: str
@@ -434,7 +434,7 @@ class Switch:
 
     def find_device_substr(self, device):
         """
-        Find a device on the switch by its NetConfig name
+        Find a device on the switch by its sdfconfig name
 
         :param device: A substring of the name of the device
         :type  device: str
@@ -487,7 +487,7 @@ class Switch:
         :type  host: str
 
         :return: The vlan number and subnet associated with the devices
-                 NetConfig entry
+                 sdfconfig entry
         :rtype: tuple
         """
         subnet = get_subnet_for_host(host)
@@ -667,7 +667,7 @@ class Switch:
         This function looks at all of the devices found on the switch and
         determines whether the device is on the correct subnet by comparing the
         name of the subnet associated with the VLAN to the information in
-        NetConfig
+        sdfconfig
 
         :return: A list of devices on the wrong subnet
         :rtype: list
