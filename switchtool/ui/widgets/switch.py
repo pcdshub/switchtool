@@ -299,23 +299,26 @@ class SwitchWidget(QtWidgets.QWidget):
                     h = self.switch_name.split("-")[1].lower()
                 except Exception:
                     h = "NOHUTCH"
-                sub = "cds-%s.pcdsn" % h
+                sub = "PCDSN-CDS-%s" % h.upper()
                 if sub in allsubs.keys():
                     vl.append(allsubs[sub])
-                sub = "fez-%s.pcdsn" % h
+                sub = "PCDSN-FEZ-%s" % h.upper()
                 if sub in allsubs.keys():
                     vl.append(allsubs[sub])
-                sub = "ics.pcdsn"
+                sub = "PCDSN-ICS-%s" % h.upper()
                 if sub in allsubs.keys():
                     vl.append(allsubs[sub])
-                sub = "cds-las.pcdsn"
+                sub = "PCDSN-ICS"
+                if sub in allsubs.keys():
+                    vl.append(allsubs[sub])
+                sub = "PCDSN-CDS-LAS"
                 if sub in allsubs.keys():
                     vl.append(allsubs[sub])
                 for v in vlist:
-                    if v not in vl and allvlan[v][:3] == "cds":
+                    if v not in vl and allvlan[v].split("-")[1] == "CDS":
                         vl.append(v)
                 for v in vlist:
-                    if v not in vl and allvlan[v][:3] == "fez":
+                    if v not in vl and allvlan[v].split("-")[1] == "FEZ":
                         vl.append(v)
                 self._vlanList = vl
 
