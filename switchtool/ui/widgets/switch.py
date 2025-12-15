@@ -7,6 +7,7 @@ from ...EpicsQT.qlogdisplay import QLogDisplay
 from ...switch.switch import Switch
 from .. import dialogs
 from .vlan import VlanWidget
+from ...sdfconfig import get_subnet_for_host
 
 
 class SwitchWidget(QtWidgets.QWidget):
@@ -94,10 +95,21 @@ class SwitchWidget(QtWidgets.QWidget):
         self.setLayout(self.lay)
 
         self.finddialog = None
+
+        try:
+            get_subnet_for_host(switch)
+        except RuntimeError:
+            self.switch_log.error(
+                "sdfconfig not configured for user. "
+                "We will not be able to get hostnames from mac addresses "
+                "or identify device subnets."
+            )
+
         self.timer = QTimer()
         self.timer.timeout.connect(self.need_refresh)
         self.repaint()
         QTimer.singleShot(100, self.initial_update)
+
 
     def initial_update(self):
         self.updated.connect(self.refresh)

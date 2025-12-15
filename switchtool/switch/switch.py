@@ -48,8 +48,10 @@ def determine_type(hostname: str):
             if st in desc:
                 module_logger.info(f"{hostname} is switch type {st}")
                 return st
-    except Exception as exc:
+    except RuntimeError as exc:
         raise RuntimeError("Error running sdfconfig") from exc
+    except Exception:
+        ...
     raise RuntimeError(
         f"Switch {hostname} is either an unsupported type or does not have "
         "the switch type in its sdfconfig description. "
@@ -312,7 +314,7 @@ class Switch:
                         "port": port,
                         "vlan": vlan_no,
                     }
-                except KeyError:
+                except (KeyError, RuntimeError):
                     module_logger.debug(
                         "Unable to find sdfconfig entry for {:} on port {:}".format(
                             address, port
@@ -369,7 +371,7 @@ class Switch:
                         "port": port,
                         "vlan": vlan_no,
                     }
-                except KeyError:
+                except (KeyError, RuntimeError):
                     module_logger.debug(
                         "Unable to find sdfconfig entry for {:} on port {:}".format(
                             address, port
@@ -686,6 +688,8 @@ class Switch:
         from the module to make sure that you know which ports are moved
         """
         misplaced = self.survey()
+        if not misplaced:
+            return
         for device in misplaced:
             module_logger.info("Attempting to move {:}".format(device))
             vlan, subnet = self.find_subnet_for_host(device)
@@ -975,7 +979,11 @@ class Vlan:
         subnet = self.subnet
 
         for device in self.devices:
-            host_subnet = get_subnet_for_host(device)
+            try:
+                host_subnet = get_subnet_for_host(device)
+            except RuntimeError:
+                module_logger.error("sdfconfig is not configured for user")
+                return []
             if host_subnet != subnet:
                 module_logger.warning(
                     "{:} is not on the correct subnet, it should be on {:}".format(
