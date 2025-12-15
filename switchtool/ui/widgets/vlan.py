@@ -146,7 +146,7 @@ class VlanWidget(QTableWidget):
         """
         row = self._portWidgets[port].row()
         i = self.item(row, self.DEVCOL)
-        i.setText(".".join(device.split(".")[:-1]))
+        i.setText(device)
         i = self.item(row, self.MACCOL)
         i.setText(mac)
 
@@ -181,7 +181,7 @@ class VlanWidget(QTableWidget):
         self._labels[row] = name
         self._power[row] = pwr
         i = self.item(row, self.DEVCOL)
-        i.setText(".".join(dname.split(".")[:-1]))
+        i.setText(dname)
         i = self.item(row, self.MACCOL)
         i.setText(mac)
         if pwr != "Non-PD":
