@@ -126,7 +126,7 @@ class Switch:
     @property
     def subnets(self):
         """
-        The list of vlan number, subnet pairs that are found on the switch
+        The list of (vlan number, subnet) pairs that are found on the switch
         """
         subnets = [(vlan._vlan_no, vlan.subnet) for vlan in self._vlan]
         return sorted(subnets, key=lambda sub: int(sub[0]))
