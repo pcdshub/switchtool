@@ -11,7 +11,7 @@ from ..survey import survey
 
 module_logger = logging.getLogger(__name__)
 
-switch_types = {
+SWITCH_NAME_TO_SURVEYER = {
     "arista": survey.AristaSurveyer,
     "brocade": survey.BrocadeSurveyer,
     "foundry": survey.BrocadeSurveyer,  # foundry acquired by brocade
@@ -44,7 +44,7 @@ def determine_type(hostname: str):
     desc = ""
     try:
         desc = get_desc_for_host(hostname=hostname)
-        for st in switch_types.keys():
+        for st in SWITCH_NAME_TO_SURVEYER.keys():
             if st in desc:
                 module_logger.info(f"{hostname} is switch type {st}")
                 return st
@@ -56,7 +56,7 @@ def determine_type(hostname: str):
         f"Switch {hostname} is either an unsupported type or does not have "
         "the switch type in its sdfconfig description. "
         f'The description was "{desc}", and the '
-        f"supported switch types are {', '.join(switch_types.keys())}. "
+        f"supported switch types are {', '.join(SWITCH_NAME_TO_SURVEYER.keys())}. "
     )
 
 
@@ -886,7 +886,7 @@ class Switch:
         Return survey object based on type attribute
         """
         try:
-            survey_type = switch_types[self.switch_type]
+            survey_type = SWITCH_NAME_TO_SURVEYER[self.switch_type]
         except KeyError:
             raise ValueError("{:} is not a valid switch type".format(self.switch_type))
 

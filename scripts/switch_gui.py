@@ -5,7 +5,7 @@ import sys
 from PyQt5.QtWidgets import QApplication
 
 import switchtool.ui as switch_ui
-from switchtool.switch.switch import switch_types
+from switchtool.switch.switch import SWITCH_NAME_TO_SURVEYER
 
 """
 Launch Switch GUI
@@ -33,7 +33,7 @@ def main():
         "--switch-type",
         type=str,
         help="Specify a switch model for when it cannot be determined automatically.",
-        choices=list(switch_types),
+        choices=list(SWITCH_NAME_TO_SURVEYER),
         default=None,
     )
 
