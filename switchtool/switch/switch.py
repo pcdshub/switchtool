@@ -407,7 +407,7 @@ class Switch:
             num = self._portmap[port]
             module_logger.debug("Found {:} on VLAN {:}".format(port, num))
             return num
-        except Exception:
+        except KeyError:
             module_logger.debug("Unable to find port {:} on any VLAN".format(port))
             return None
 
