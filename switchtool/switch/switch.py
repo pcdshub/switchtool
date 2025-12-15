@@ -979,6 +979,9 @@ class Vlan:
         subnet = self.subnet
 
         for device in self.devices:
+            if not device.strip():
+                # No hostname information...
+                continue
             try:
                 host_subnet = get_subnet_for_host(device)
             except RuntimeError:
