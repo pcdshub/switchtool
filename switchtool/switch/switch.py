@@ -6,7 +6,7 @@ from pathlib import Path
 
 import simplejson
 
-from ..sdfconfig import get_desc_for_host, get_host_for_mac, get_subnet_for_host
+from ..sdfconfig import get_metadata_for_host, get_host_for_mac, get_subnet_for_host
 from ..survey import survey
 
 module_logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ CONFIG_DIR = str(Path(__file__).parent.parent.parent / "config")
 
 def determine_type(hostname: str):
     """
-    Return the type of the switch based on the sdfconfig description.
+    Return the type of the switch based on the sdfconfig metadata.
 
     Parameters
     ----------
@@ -41,11 +41,11 @@ def determine_type(hostname: str):
     RuntimeError
         If the type of the switch cannot be determined.
     """
-    desc = ""
+    meta = ""
     try:
-        desc = get_desc_for_host(hostname=hostname)
+        meta = get_metadata_for_host(hostname=hostname)
         for st in SWITCH_NAME_TO_SURVEYER.keys():
-            if st in desc:
+            if st in meta:
                 module_logger.info(f"{hostname} is switch type {st}")
                 return st
     except RuntimeError as exc:
@@ -54,8 +54,8 @@ def determine_type(hostname: str):
         ...
     raise RuntimeError(
         f"Switch {hostname} is either an unsupported type or does not have "
-        "the switch type in its sdfconfig description. "
-        f'The description was "{desc}", and the '
+        "the switch type in its sdfconfig metadata. "
+        f'The metadata was "{meta}", and the '
         f"supported switch types are {', '.join(SWITCH_NAME_TO_SURVEYER.keys())}. "
     )
 

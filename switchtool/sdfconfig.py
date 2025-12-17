@@ -11,6 +11,7 @@ at time of writing.
 
 import functools
 import subprocess
+import json
 
 
 @functools.lru_cache(maxsize=1000)
@@ -32,16 +33,16 @@ def get_host_for_mac(mac_addr: str) -> str:
         raise RuntimeError("sdfconfig is not configured for user") from exc
 
 
-def get_desc_for_host(hostname: str) -> str:
+def get_metadata_for_host(hostname: str) -> str:
     """
-    Get the contents of the description field for hostname
+    Get the contents of the metadata field for hostname
     
-    Returns an empty string if the description field hasn't been added yet,
+    Returns an empty string if the metadata field hasn't been added yet,
     or if the host does not exist.
 
     May raise if sdfconfig is not configured for the user.
     """
-    return sdfconfig_view(hostname)["description"]
+    return sdfconfig_view(hostname)["Metadata"]
 
 
 def get_subnet_for_host(hostname: str) -> str:
@@ -52,7 +53,7 @@ def get_subnet_for_host(hostname: str) -> str:
 
     May raise if sdfconfig is not configured for the user.
     """
-    return sdfconfig_view(hostname)["subnet_name"]
+    return sdfconfig_view(hostname)["Subnet Name"]
 
 
 def remove_domain(fqdn: str) -> str:
@@ -74,18 +75,9 @@ def sdfconfig_view(hostname: str) -> dict[str, str]:
     """
     try:
         info = subprocess.check_output(
-            ["sdfconfig", "view", f"{hostname}.pcdsn"],
+            ["sdfconfig", "view", "--json", f"{hostname}.pcdsn"],
             universal_newlines=True,
         )
     except subprocess.CalledProcessError as exc:
         raise RuntimeError("sdfconfig is not configured for user") from exc
-    output = {}
-    lines = info.split("\n")
-    for line in lines:
-        parts = line.strip().split(":")
-        if len(parts) < 2:
-            continue
-        key = parts[0].lower().replace(" ", "_").strip()
-        value = ":".join(parts[1:]).strip()
-        output[key] = value
-    return output
+    return json.loads(info)
