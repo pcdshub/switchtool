@@ -33,16 +33,13 @@ def get_host_for_mac(mac_addr: str) -> str:
         raise RuntimeError("sdfconfig is not configured for user") from exc
 
 
-def get_metadata_for_host(hostname: str) -> str:
+def get_description_for_host(hostname: str) -> str:
     """
-    Get the contents of the metadata field for hostname
-    
-    Returns an empty string if the metadata field hasn't been added yet,
-    or if the host does not exist.
+    Get the contents of the description field for hostname
 
     May raise if sdfconfig is not configured for the user.
     """
-    return sdfconfig_view(hostname)["Metadata"]
+    return sdfconfig_view(hostname)["Description"]
 
 
 def get_subnet_for_host(hostname: str) -> str:
