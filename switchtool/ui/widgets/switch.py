@@ -1,6 +1,4 @@
-import functools
 import logging
-import sys
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QSettings, QTimer, pyqtSignal, pyqtSlot
@@ -9,6 +7,7 @@ from ...EpicsQT.qlogdisplay import QLogDisplay
 from ...switch.switch import Switch
 from .. import dialogs
 from .vlan import VlanWidget
+from ...sdfconfig import get_subnet_for_host
 
 
 class SwitchWidget(QtWidgets.QWidget):
@@ -18,11 +17,11 @@ class SwitchWidget(QtWidgets.QWidget):
     updated = pyqtSignal()
     update_port = pyqtSignal(str, str, str, str, str, str)
 
-    def __init__(self, switch, user=None, pw=None, timeout=1.0, parent=None):
-        super(SwitchWidget, self).__init__(parent=parent)
+    def __init__(self, switch, user="admin", pw=None, switch_type=None, timeout=1.0, parent=None):
+        super().__init__(parent=parent)
         self.resize(660, 700)
 
-        self._switch = None
+        self._switch = PyQtSwitch(switch, user=user, pw=pw, enablepw=None, switch_type=switch_type, parent=self)
         self.switch_name = switch.split(".")[0]
         self.refresh_timeout = timeout * 3600000  # Now ms!
 
@@ -96,13 +95,23 @@ class SwitchWidget(QtWidgets.QWidget):
         self.setLayout(self.lay)
 
         self.finddialog = None
+
+        try:
+            get_subnet_for_host(switch)
+        except RuntimeError:
+            self.switch_log.error(
+                "sdfconfig not configured for user. "
+                "We will not be able to get hostnames from mac addresses "
+                "or identify device subnets."
+            )
+
         self.timer = QTimer()
         self.timer.timeout.connect(self.need_refresh)
         self.repaint()
-        QTimer.singleShot(100, functools.partial(self.initial_update, switch, user, pw))
+        QTimer.singleShot(100, self.initial_update)
 
-    def initial_update(self, switch, user, pw):
-        self._switch = PyQtSwitch(switch, user=user, pw=pw, enablepw=None, parent=self)
+
+    def initial_update(self):
         self.updated.connect(self.refresh)
         self.update_port.connect(self.refresh_port)
         self._switch.update()
@@ -145,8 +154,8 @@ class SwitchWidget(QtWidgets.QWidget):
         device = self.deviceLine.text()
         if self.finddialog:
             self.finddialog.close()
-        l = self._switch.find_device_substr(device)
-        ll = len(l)
+        substr = self._switch.find_device_substr(device)
+        ll = len(substr)
         if ll == 0:
             QtWidgets.QMessageBox.critical(
                 None,
@@ -156,9 +165,9 @@ class SwitchWidget(QtWidgets.QWidget):
                 QtWidgets.QMessageBox.Ok,
             )
         elif ll == 1:
-            self.select_vlan(l[0][1], port=l[0][2])
+            self.select_vlan(substr[0][1], port=substr[0][2])
         else:
-            self.finddialog = dialogs.FindDialog(device, l, parent=self)
+            self.finddialog = dialogs.FindDialog(device, substr, parent=self)
             self.finddialog.accepted.connect(self.FDaccept)
             self.finddialog.closing.connect(self.FDclose)
             self.finddialog.select.connect(self.FDselect)
@@ -167,7 +176,8 @@ class SwitchWidget(QtWidgets.QWidget):
     @pyqtSlot()
     def FDaccept(self):
         fd = self.finddialog
-        fd.close()
+        if fd is not None:
+            fd.close()
 
     @pyqtSlot()
     def FDclose(self):
@@ -189,8 +199,9 @@ class SwitchWidget(QtWidgets.QWidget):
 
     @pyqtSlot(int, int)
     def tabMoved(self, start, dest):
-        self._vlanList.insert(dest, self._vlanList.pop(start))
-        self.settings.setValue("vlan_order/%s" % self.switch_name, self._vlanList)
+        if isinstance(self._vlanList, list):
+            self._vlanList.insert(dest, self._vlanList.pop(start))
+            self.settings.setValue("vlan_order/%s" % self.switch_name, self._vlanList)
 
     @pyqtSlot()
     def do_update(self):
@@ -298,25 +309,28 @@ class SwitchWidget(QtWidgets.QWidget):
                 vl.append(-1)
                 try:
                     h = self.switch_name.split("-")[1].lower()
-                except:
+                except Exception:
                     h = "NOHUTCH"
-                sub = "cds-%s.pcdsn" % h
+                sub = "PCDSN-CDS-%s" % h.upper()
                 if sub in allsubs.keys():
                     vl.append(allsubs[sub])
-                sub = "fez-%s.pcdsn" % h
+                sub = "PCDSN-FEZ-%s" % h.upper()
                 if sub in allsubs.keys():
                     vl.append(allsubs[sub])
-                sub = "ics.pcdsn"
+                sub = "PCDSN-ICS-%s" % h.upper()
                 if sub in allsubs.keys():
                     vl.append(allsubs[sub])
-                sub = "cds-las.pcdsn"
+                sub = "PCDSN-ICS"
+                if sub in allsubs.keys():
+                    vl.append(allsubs[sub])
+                sub = "PCDSN-CDS-LAS"
                 if sub in allsubs.keys():
                     vl.append(allsubs[sub])
                 for v in vlist:
-                    if v not in vl and allvlan[v][:3] == "cds":
+                    if v not in vl and allvlan[v].split("-")[1] == "CDS":
                         vl.append(v)
                 for v in vlist:
-                    if v not in vl and allvlan[v][:3] == "fez":
+                    if v not in vl and allvlan[v].split("-")[1] == "FEZ":
                         vl.append(v)
                 self._vlanList = vl
 
@@ -350,7 +364,7 @@ class SwitchWidget(QtWidgets.QWidget):
         self.portCombo.addItems(sorted(ports))
         self.deviceCombo.addItems(sorted(devices))
 
-        self.timer.start(self.refresh_timeout)
+        self.timer.start(int(self.refresh_timeout))
         self.refresh_button.setStyleSheet("color:black;")
 
     @pyqtSlot(str, str, str, str, str, str)
@@ -366,7 +380,7 @@ class SwitchWidget(QtWidgets.QWidget):
             vlan = self._vlan[vlan_no]
             self._vlanTab.setCurrentWidget(vlan)
             if port:
-                self._vlanTab.currentWidget().select_port(port)
+                self._vlanTab.currentWidget().select_port(port)  # type: ignore
 
     def move_port(self):
         """
@@ -407,14 +421,14 @@ class SwitchWidget(QtWidgets.QWidget):
 
 
 class PyQtSwitch(Switch):
-    def __init__(self, switchname, user="admin", pw=None, enablepw=None, parent=None):
+    def __init__(self, switchname, user="admin", pw=None, enablepw=None, switch_type=None, parent=None):
         self.parent = parent
-        if not pw:
-            self._pw = dialogs.passwddialog.getPassword(
-                "Password for {:}: ".format(self._user)
+        if pw is None:
+            pw = dialogs.passwddialog.getPassword(
+                "Password for {:}: ".format(user)
             )
-        super(PyQtSwitch, self).__init__(
-            switchname, user=user, pw=pw, enablepw=enablepw
+        super().__init__(
+            switchname, user=user, pw=pw, enablepw=enablepw, switch_type=switch_type,
         )
 
     def update(self):
@@ -430,7 +444,8 @@ class PyQtSwitch(Switch):
             self.parent.update_port.emit(port, vlan, mac, name, dname, pwr)
 
     def get_enablepw(self):
-        self.switch_log.info("Prompting for enable password")
+        if isinstance(self.parent, SwitchWidget):
+            self.parent.switch_log.info("Prompting for enable password")
         self._enablepw = dialogs.passwddialog.getPassword(
             "Enable password for {:}: ".format(self._user)
         )

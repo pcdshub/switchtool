@@ -1,19 +1,27 @@
-import logging
 import re
 
 from . import command, utils
 
 
-class Surveyer(object):
+class Surveyer:
     """
     Class to survey devices on switch.
     """
 
-    _vlan_format = None
-    _port_format = None
-    _pwr_format = None
-    _lbl_format = None
-    _cmd_runner = None
+    # The specific values for these must be set in the subclass
+    _vlan_format: re.Pattern[str]
+    _port_format: re.Pattern[str]
+    _pwr_format: re.Pattern[str]
+    _lbl_format: re.Pattern[str]
+    _mac_format: re.Pattern[str]
+    _lbl_cmd_port: str
+    _pwr_cmd_port: str
+    _cmd_runner: type[
+        command.AristaCommandRunner
+        | command.BrocadeCommandRunner
+        | command.CiscoCommandRunner
+        | command.RuckusCommandRunner
+    ]
 
     def __init__(self, user, pw, enablepw, port=None, timeout=None):
         self.user = user
@@ -60,7 +68,6 @@ class Surveyer(object):
         """
         Create a dictionary of MAC addresses found on each port.
         """
-        mac_info = {}
         cmd = [self._mac_cmd]
         if vlan_no:
             cmd[0] = "{:} vlan {:}".format(cmd[0].rstrip("\n"), vlan_no)
@@ -100,10 +107,10 @@ class Surveyer(object):
             self.user, self.pw, self.enablepw, self.port, cmd, timeout=self.timeout
         )
         out_code, raw_lbl = cmdr.run(host)
-        return dict([(p, l) for p, l in self._lbl_format.findall(raw_lbl)])
+        return dict([(p, el) for p, el in self._lbl_format.findall(raw_lbl)])
 
     # Let's claim no one needs an enable command by default!
-    def check_mode(self, host):
+    def check_mode(self, host) -> bool:
         return False
 
     def update_port(self, host, port):
@@ -129,13 +136,13 @@ class Surveyer(object):
                 break
         if self._lbl_format is not None:
             lbl = self._lbl_format.findall(raw)
-            l = ""
+            el = ""
             for i, j in lbl:
                 if i == port:
-                    l = j
+                    el = j
                     break
         else:
-            l = ""
+            el = ""
         if self._pwr_format is not None:
             pwr = self._pwr_format.findall(raw)
             p = "Non-PD"
@@ -145,7 +152,7 @@ class Surveyer(object):
                     break
         else:
             p = "Non-PD"
-        return (p, l, m)
+        return (p, el, m)
 
 
 class BrocadeSurveyer(Surveyer):
@@ -273,13 +280,13 @@ class AristaSurveyer(Surveyer):
         ll = l1.split("\n")
         cont = False
         l2 = ""
-        for l in ll:
-            if cont and len(l) > 0 and l[0] >= "0" and l[0] <= "9":
+        for el in ll:
+            if cont and len(el) > 0 and el[0] >= "0" and el[0] <= "9":
                 l2 += "\n"
                 cont = False
-            if len(l) > 0 and l[0] >= "0" and l[0] <= "9":
-                l2 += l.strip()
+            if len(el) > 0 and el[0] >= "0" and el[0] <= "9":
+                l2 += el.strip()
                 cont = True
             elif cont:
-                l2 += ", " + l.strip()
+                l2 += ", " + el.strip()
         return l2

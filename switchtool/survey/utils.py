@@ -13,8 +13,15 @@ LOG = logging.getLogger(LOG_CONF.get("logger_name", __name__))
 
 
 # Mac matching regex
-__HOST_REGEX = re.compile("^(?P<host>\S*):$")
-__MAC_REGEX = re.compile("^\s*Ethernet Address: (?P<mac>\S*)$")
+__HOST_REGEX = re.compile(r"^(?P<host>\S*):$")
+__MAC_REGEX = re.compile(r"^\s*Ethernet Address: (?P<mac>\S*)$")
+
+
+def uses_netconfig():
+    raise NotImplementedError(
+        "This function needs to be reworked to use sdfconfig. "
+        "Netconfig is gone forever."
+    )
 
 
 def convert_eth(ethernet):
@@ -46,6 +53,7 @@ def _get_ethe_addr(netconf_data):
 def _query_netconfig(cmd, search, params, excludes, mac_filter):
     """From Python 2.7 to Python 3.5 issues:"""
     """ Needed to add ".decode("utf-8")" to stdout to convert bytes to str """
+    uses_netconfig()
     proc = Popen(cmd + [search] + params, stdout=PIPE, stderr=PIPE)
     (stdout, stderr) = proc.communicate()
 
@@ -67,6 +75,7 @@ def _query_netconfig(cmd, search, params, excludes, mac_filter):
 
 
 def get_device_list(searches, subnets, mac_pattern=None):
+    uses_netconfig()
     netconf_cmd = [NETCONFIG_CONF.get("script"), NETCONFIG_CONF.get("cmd")]
     netconf_param = []
     netconf_out = []
@@ -105,6 +114,7 @@ def get_device_list(searches, subnets, mac_pattern=None):
 
 def get_info_location(search, subnets=None, mac_pattern=None):
     """Extracts name, Location and Description contents from netconfig view command"""
+    uses_netconfig()
     netconf_cmd = [NETCONFIG_CONF.get("script"), NETCONFIG_CONF.get("cmd_view")]
     netconf_param = []
     name = ""
@@ -134,6 +144,7 @@ def get_info_location(search, subnets=None, mac_pattern=None):
 # def get_info_location_list(searches, subnets=None, mac_pattern=None):
 #     ''' Extracts name, Location and Description contents from netconfig view command '''
 #     ''' NOT USED HERE '''
+#     uses_netconfig()
 #     netconf_cmd = [NETCONFIG_CONF.get('script'), NETCONFIG_CONF.get('cmd_view')]
 #     netconf_param = []
 #     netconf_out = []
@@ -171,12 +182,14 @@ def get_digi_info_location(failed_host):
 
 
 def get_switch_list():
+    uses_netconfig()
     return get_device_list(
         NETCONFIG_CONF.get("switch_searches"), NETCONFIG_CONF.get("switch_subnets")
     )
 
 
 def get_digi_list():
+    uses_netconfig()
     return get_device_list(
         NETCONFIG_CONF.get("digi_searches"),
         NETCONFIG_CONF.get("digi_subnets"),

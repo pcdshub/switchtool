@@ -1,17 +1,17 @@
 import logging
-import os
-import sys
+import subprocess
 import time
-from os import getenv, path
+from os import path
+from pathlib import Path
 
 import simplejson
 
-from ..netconfig import netconfig
+from ..sdfconfig import get_description_for_host, get_host_for_mac, get_subnet_for_host
 from ..survey import survey
 
 module_logger = logging.getLogger(__name__)
 
-switch_types = {
+SWITCH_NAME_TO_SURVEYER = {
     "arista": survey.AristaSurveyer,
     "brocade": survey.BrocadeSurveyer,
     "foundry": survey.BrocadeSurveyer,  # foundry acquired by brocade
@@ -19,38 +19,44 @@ switch_types = {
     "cisco": survey.CiscoSurveyer,
 }
 
-CONFIG_DIR = path.join(getenv("RELDIR"), "config")
+CONFIG_DIR = str(Path(__file__).parent.parent.parent / "config")
 
 
-def determine_type(nc, name):
+def determine_type(hostname: str):
     """
-    Return the type of the switch based on the list of switches kept in the
-    CONFIG_DIR directory
+    Return the type of the switch based on the sdfconfig description.
 
-    :param nc: The netconfig information.
-    :type  name: netconfig.NetConfig
+    Parameters
+    ----------
+    name : str
+        The name of the switch
 
-    :param name: The name of the switch
-    :type  name: str
+    Returns
+    -------
+    switch_type : str
+        The type of the switch.
 
-    :return: The type of switch based on the netconfig description.
+    Raises
+    ------
+    RuntimeError
+        If the type of the switch cannot be determined.
     """
+    desc = ""
     try:
-        n = nc.find_hosts(name, as_dict=True)[name]
-        d = n["description"].lower()
-        for s in switch_types.keys():
-            if s in d:
-                module_logger.info(
-                    "%s is a%s %s switch." % (name, "n" if s[0] in "aeiou" else "", s)
-                )
-                return s
-    except:
-        d = ""
+        desc = get_description_for_host(hostname=hostname)
+        for st in SWITCH_NAME_TO_SURVEYER.keys():
+            if st in desc.lower():
+                module_logger.info(f"{hostname} is switch type {st}")
+                return st
+    except RuntimeError as exc:
+        raise RuntimeError("Error running sdfconfig") from exc
+    except Exception:
+        ...
     raise RuntimeError(
-        f"Switch {name} is either an unsupported type or does not have "
-        "the switch type in its netconfig description. "
-        f'The description was "{d}", and the '
-        f"supported switch types are {', '.join(switch_types.keys())}. "
+        f"Switch {hostname} is either an unsupported type or does not have "
+        "the switch type in its sdfconfig description. "
+        f'The description was "{desc}", and the '
+        f"supported switch types are {', '.join(SWITCH_NAME_TO_SURVEYER.keys())}. "
     )
 
 
@@ -63,29 +69,30 @@ What do we have in here?
 """
 
 
-class Switch(netconfig.host.Host):
+class Switch:
     """
-    A class to represent a network Switch.
+    A managed network switch.
 
-    :param switch_name: The name of the switch in NetConfig
-    :type  switch_name: str
+    Parameters
+    ----------
+    switch_name : str
+        The hostname of the switch.
 
-    :param user: The username used to log into the switch, by default this is
-                 the administrator username
-    :type  user: str
+    user : str, optional
+        The username used to log into the switch, by default this is
+        the admin username.
 
-    :param pw: The password of the switch, if this is not specified the
-              password will be requested in the terminal
-    :type  pw: str
+    pw : str, optional
+        The read-only (login) password of the switch,
+        if this is not specified the password will be requested.
 
-    :param enablepw: The enable password of the switch, if this is not specified, the
-              password will be requested in the terminal, if needed.
-    :type  enablepw: str
+    enablepw : str, optional
+        The write (enable) password of the switch,
+        if this is not specified, the password will be requested if needed.
 
-    :param type: The type of the switch; arista, brocade or cisco. If this not
-                selected the database of switches will queried using the
-                determine_type function.
-    :type  type: str
+    switch_type : str, optional
+        The type of the switch; arista, brocade or cisco.
+        If this is not selected, we will infer the information from sdfconfig.
     """
 
     timeout = 5
@@ -94,36 +101,32 @@ class Switch(netconfig.host.Host):
     _vlan = []
     _user = "admin"
 
-    def __init__(self, switch_name, user="admin", pw=None, enablepw=None, type=None):
-        self._nc = netconfig.NetConfig()
-
-        if not type:
-            type = determine_type(self._nc, switch_name)
+    def __init__(
+        self, switch_name, user="admin", pw=None, enablepw=None, switch_type=None
+    ):
+        if switch_type is None:
+            switch_type = determine_type(switch_name)
             module_logger.info(
-                "No switch type supplied guessing " "that switch is type {:}".format(
-                    type
+                "No switch type supplied guessing that switch is type {:}".format(
+                    switch_type
                 )
             )
 
-        self.type = type
-        host_info = list(self._nc.find_hosts(switch_name, as_dict=True).values())[0]
-        super(Switch, self).__init__(switch_name, host_info)
+        self.name = switch_name
+        self.switch_type = switch_type
 
         # Check host
-        ping = self.ping()
-        if not ping:
+        if not ping(switch_name):
             raise IOError("Unable to ping {:}".format(switch_name))
-        # Request password if not supplied
-        if user:
-            self._user = user
 
+        self._user = user
         self._pw = pw
         self._enablepw = enablepw
 
     @property
     def subnets(self):
         """
-        The list of vlan number,subnet pairs that are found on the switch
+        The list of (vlan number, subnet) pairs that are found on the switch
         """
         subnets = [(vlan._vlan_no, vlan.subnet) for vlan in self._vlan]
         return sorted(subnets, key=lambda sub: int(sub[0]))
@@ -132,9 +135,9 @@ class Switch(netconfig.host.Host):
     def _portKey(self, k):
         if k[:2] == "Et":
             return int(k[2:])
-        l = [int(x) for x in k.split("/")]
+        nums = [int(x) for x in k.split("/")]
         s = 0
-        for x in l:
+        for x in nums:
             s = 1000 * s + x
         return s
 
@@ -155,7 +158,12 @@ class Switch(netconfig.host.Host):
         return self._power
 
     def get_enablepw(self):
-        pass
+        """
+        Placeholder for child class
+
+        This should request enablepw from user and set it as self._enablepw
+        """
+        ...
 
     def set_power(self, port, state):
         # This is a privileged command: do we need/have the enable password?
@@ -246,7 +254,7 @@ class Switch(netconfig.host.Host):
     def unknown_devices(self):
         """
         Return a dictionary of all of the devices on the switch who are not
-        associated with an entry in NetConfig
+        associated with an entry in sdfconfig
 
         Each device has a sub-dictionary that returns the VLAN number,
         mac-address and port of the device
@@ -286,13 +294,13 @@ class Switch(netconfig.host.Host):
 
         module_logger.info("Requesting mac addresses from switch")
         mac = self._surveyer().show_mac(self.name)
-        module_logger.info("Searching for mac addresses in NetConfig")
+        module_logger.info("Searching for mac addresses in sdfconfig")
         for port, address in mac.items():
             module_logger.debug("Found {:} on port {:}.".format(port, address))
             vlan_no = self.find_port(port)
             if not vlan_no:
                 module_logger.debug(
-                    "{:} is a tagged port, " "ignoring mac address".format(port)
+                    "{:} is a tagged port, ignoring mac address".format(port)
                 )
                 pass
             else:
@@ -300,15 +308,15 @@ class Switch(netconfig.host.Host):
                 vlan_name = self._vlan_alias.format(vlan_no)
                 vlan = getattr(self, vlan_name)
                 try:
-                    node = self._nc._mac[address.lower()]
+                    node = get_host_for_mac(address.lower())
                     vlan._devices[node] = {
                         "ethernet_address": address,
                         "port": port,
                         "vlan": vlan_no,
                     }
-                except KeyError:
+                except (KeyError, RuntimeError):
                     module_logger.debug(
-                        "Unable to find NetConfig entry for " "{:} on port {:}".format(
+                        "Unable to find sdfconfig entry for {:} on port {:}".format(
                             address, port
                         )
                     )
@@ -356,16 +364,16 @@ class Switch(netconfig.host.Host):
                             break
             else:
                 try:
-                    node = self._nc._mac[address.lower()]
+                    node = get_host_for_mac(address.lower())
                     dname = node
                     vlan._devices[node] = {
                         "ethernet_address": address,
                         "port": port,
                         "vlan": vlan_no,
                     }
-                except KeyError:
+                except (KeyError, RuntimeError):
                     module_logger.debug(
-                        "Unable to find NetConfig entry for " "{:} on port {:}".format(
+                        "Unable to find sdfconfig entry for {:} on port {:}".format(
                             address, port
                         )
                     )
@@ -399,13 +407,13 @@ class Switch(netconfig.host.Host):
             num = self._portmap[port]
             module_logger.debug("Found {:} on VLAN {:}".format(port, num))
             return num
-        except:
+        except KeyError:
             module_logger.debug("Unable to find port {:} on any VLAN".format(port))
             return None
 
     def find_device(self, device):
         """
-        Find a device on the switch by its NetConfig name
+        Find a device on the switch by its sdfconfig name
 
         :param device: The name of the device
         :type  device: str
@@ -419,7 +427,7 @@ class Switch(netconfig.host.Host):
                 num = vlan._vlan_no
                 port = vlan._devices[device]["port"]
                 module_logger.debug(
-                    "Found {:} on VLAN {:} port " "{:}".format(device, num, port)
+                    "Found {:} on VLAN {:} port {:}".format(device, num, port)
                 )
                 return num, port
 
@@ -428,7 +436,7 @@ class Switch(netconfig.host.Host):
 
     def find_device_substr(self, device):
         """
-        Find a device on the switch by its NetConfig name
+        Find a device on the switch by its sdfconfig name
 
         :param device: A substring of the name of the device
         :type  device: str
@@ -439,23 +447,22 @@ class Switch(netconfig.host.Host):
                  list is returned if there are no matches.)
         :rtype: list
         """
-        l = []
-        dl = len(device)
+        lst = []
         for vlan in self._vlan:
             for d in vlan.devices:
                 if device in d:
                     num = vlan._vlan_no
                     port = vlan._devices[d]["port"]
                     module_logger.debug(
-                        "Found {:} on VLAN {:} port " "{:}".format(d, num, port)
+                        "Found {:} on VLAN {:} port {:}".format(d, num, port)
                     )
                     if device == d:  # If it's an exact match, just return it!
                         return [(d, num, port)]
                     else:
-                        l.append((d, num, port))
-        if l == []:
+                        lst.append((d, num, port))
+        if lst == []:
             module_logger.debug("Unable to find device {:} on any VLAN".format(device))
-        return sorted(l, key=lambda sub: sub[0])
+        return sorted(lst, key=lambda sub: sub[0])
 
     def find_vlan_for_subnet(self, subnet):
         """
@@ -482,13 +489,13 @@ class Switch(netconfig.host.Host):
         :type  host: str
 
         :return: The vlan number and subnet associated with the devices
-                 NetConfig entry
+                 sdfconfig entry
         :rtype: tuple
         """
-        host = self._load_host(host)
-        vlan = self.find_vlan_for_subnet(host.subnet)
+        subnet = get_subnet_for_host(host)
+        vlan = self.find_vlan_for_subnet(subnet)
 
-        return vlan, host.subnet
+        return vlan, subnet
 
     def move_port(self, port, vlan_no, verify=True):
         """
@@ -546,7 +553,7 @@ class Switch(netconfig.host.Host):
                 ]
             )
         else:
-            module_logger.debug("{:} is already on default " "VLAN".format(port))
+            module_logger.debug("{:} is already on default VLAN".format(port))
 
         # Check if destination vlan is valid
         if not vlan_no == "1":
@@ -590,11 +597,11 @@ class Switch(netconfig.host.Host):
         self.update()
         final = self.find_port(port)
         if final == vlan_no:
-            module_logger.info("Port {:} is now on " "VLAN {:}".format(port, vlan_no))
+            module_logger.info("Port {:} is now on VLAN {:}".format(port, vlan_no))
             return True
         else:
             module_logger.warning(
-                "Port move was unsuccesful, " "port {:} is now on VLAN {:}".format(
+                "Port move was unsuccesful, port {:} is now on VLAN {:}".format(
                     port, final
                 )
             )
@@ -662,7 +669,7 @@ class Switch(netconfig.host.Host):
         This function looks at all of the devices found on the switch and
         determines whether the device is on the correct subnet by comparing the
         name of the subnet associated with the VLAN to the information in
-        NetConfig
+        sdfconfig
 
         :return: A list of devices on the wrong subnet
         :rtype: list
@@ -681,21 +688,19 @@ class Switch(netconfig.host.Host):
         from the module to make sure that you know which ports are moved
         """
         misplaced = self.survey()
+        if not misplaced:
+            return
         for device in misplaced:
             module_logger.info("Attempting to move {:}".format(device))
             vlan, subnet = self.find_subnet_for_host(device)
             if vlan:
-                verify = self.move_device(
-                    device, subnet=subnet, update=False, verify=False
-                )
+                verify = self.move_device(device, subnet=subnet, verify=False)
                 if not verify:
-                    module_logger.warn(
-                        "Unable to move device {:} on to " "subnet {:}".format(
-                            device, host["subnet"]
-                        )
+                    module_logger.warning(
+                        "Unable to move device {:} to subnet {:}".format(device, subnet)
                     )
             else:
-                module_logger.warn(
+                module_logger.warning(
                     "Device {:} can not be moved to the subnet "
                     "{:} because it is not present on the "
                     "switch".format(device, subnet)
@@ -704,7 +709,7 @@ class Switch(netconfig.host.Host):
         self.update()
         unmoveable = self.survey()
         for device in unmoveable:
-            module_logger.warn("{:} remains on the wrong " "subnet".format(unmoveable))
+            module_logger.warning("{:} remains on the wrong subnet".format(unmoveable))
 
     def write_memory(self):
         """
@@ -764,16 +769,13 @@ class Switch(netconfig.host.Host):
                     will be the directory specified by CONFIG_DIR/configs
         :type  dir: str
         """
-        cfg = {}
         if not dir:
             dir = path.join(CONFIG_DIR, "configs")
 
         if not file:
             file = "{:}_{:}.json".format(self.name, time.ctime().replace(" ", "-"))
 
-        module_logger.info(
-            "Saving configuration " "to {:}".format(path.join(dir, file))
-        )
+        module_logger.info("Saving configuration to {:}".format(path.join(dir, file)))
 
         with open(path.join(dir, file), "w+") as f:
             simplejson.dump(self.get_configuration(), f)
@@ -804,7 +806,7 @@ class Switch(netconfig.host.Host):
         file = path.join(dir, file)
 
         module_logger.info(
-            "Comparing current configuration to the saved file " "{:}".format(file)
+            "Comparing current configuration to the saved file {:}".format(file)
         )
 
         if not path.exists(path.join(file)):
@@ -816,15 +818,13 @@ class Switch(netconfig.host.Host):
         for vlan, info in past_config.items():
             current = current_cfg.get(vlan)
             if not current:
-                module_logger.warning(
-                    "VLAN {:} is not on switch " "anymore".format(vlan)
-                )
+                module_logger.warning("VLAN {:} is not on switch anymore".format(vlan))
             else:
                 for port in info["ports"]:
                     if port not in current["ports"]:
                         current_vlan = self.find_port(port)
                         module_logger.info(
-                            "Port {:} has moved " "from {:} to {:}".format(
+                            "Port {:} has moved from {:} to {:}".format(
                                 port, vlan, current_vlan
                             )
                         )
@@ -835,7 +835,7 @@ class Switch(netconfig.host.Host):
                         current_vlan, port = self.find_device(device)
                         if current_vlan:
                             module_logger.info(
-                                "Device {:} has moved " "from {:} to {:}".format(
+                                "Device {:} has moved from {:} to {:}".format(
                                     device, vlan, current_vlan
                                 )
                             )
@@ -845,9 +845,7 @@ class Switch(netconfig.host.Host):
                             }
                         else:
                             module_logger.warning(
-                                "Device {:} is no longer " "on the switch".format(
-                                    device
-                                )
+                                "Device {:} is no longer on the switch".format(device)
                             )
                             moved["devices"][device] = {"past": vlan, "current": None}
 
@@ -870,7 +868,7 @@ class Switch(netconfig.host.Host):
         for port, cfg in diff["ports"].items():
             destination = cfg["past"]
             module_logger.info(
-                "Moving port {:} from {:} " "to {:}".format(
+                "Moving port {:} from {:} to {:}".format(
                     port, cfg["current"], destination
                 )
             )
@@ -888,23 +886,17 @@ class Switch(netconfig.host.Host):
         Return survey object based on type attribute
         """
         try:
-            survey_type = switch_types[self.type]
+            survey_type = SWITCH_NAME_TO_SURVEYER[self.switch_type]
         except KeyError:
-            raise ValueError("{:} is not a valid switch type".format(self.type))
+            raise ValueError("{:} is not a valid switch type".format(self.switch_type))
 
         surveyer = survey_type(
             self._user, self._pw, self._enablepw, port=self._port, timeout=self.timeout
         )
         return surveyer
 
-    def _load_host(self, host):
-        """
-        Return a Host object for a device with name host
-        """
-        return self._nc.find_hosts(host, as_object=True)
 
-
-class Vlan(object):
+class Vlan:
     _devices = {}
 
     """
@@ -959,7 +951,7 @@ class Vlan(object):
                 subnet = subnets[str(self._vlan_no)]
             except KeyError:
                 module_logger.warning(
-                    "VLAN {:} is not associated with " "a specific subnet".format(
+                    "VLAN {:} is not associated with a specific subnet".format(
                         self._vlan_no
                     )
                 )
@@ -977,24 +969,62 @@ class Vlan(object):
         This function looks at all of the devices found on the VLAN and
         determines whether the device is on the correct subnet by comparing the
         name of the subnet associated with the VLAN to the information in
-        NetConfig
+        sdfconfig.
 
-        :return: A list of devices on the wrong subnet
-        :rtype: list
+        Returns
+        devices : list[str]
+            A list of devices on the wrong subnet
         """
         misplaced = []
         subnet = self.subnet
 
         for device in self.devices:
-            host = self._switch._load_host(device)
-            if host.subnet != subnet:
+            if not device.strip():
+                # No hostname information...
+                continue
+            try:
+                host_subnet = get_subnet_for_host(device)
+            except RuntimeError:
+                module_logger.error("sdfconfig is not configured for user")
+                return []
+            if host_subnet != subnet:
                 module_logger.warning(
-                    "{:} is not on the correct "
-                    "subnet, it should be on "
-                    "{:}".format(device, host.subnet)
+                    "{:} is not on the correct subnet, it should be on {:}".format(
+                        device, host_subnet
+                    )
                 )
                 misplaced.append(device)
             else:
                 module_logger.debug("{:} on the correct subnet".format(device))
-
         return misplaced
+
+
+def ping(hostname: str, wait: int = 1) -> bool:
+    """
+    Ping device.
+
+    This was formerly psnet.netconfig.host.Host.ping
+
+    Parameters
+    ----------
+    hostname : str
+        The hostname or ip address to ping.
+
+    wait : int
+        The number of seconds to wait for a response.
+
+    Returns
+    -------
+    reponsive : bool
+        Whether or not the device was responsive within the wait period.
+    """
+    ping_response = subprocess.call(
+        ["ping", "-c1", "-w{:}".format(wait), "{:}".format(hostname)],
+        stdout=subprocess.PIPE,
+    )
+    if ping_response == 0:
+        module_logger.info("{:} was responsive to ping".format(hostname))
+        return True
+
+    module_logger.warning("{:} was unresponsive to ping".format(hostname))
+    return False
