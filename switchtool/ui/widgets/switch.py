@@ -326,12 +326,21 @@ class SwitchWidget(QtWidgets.QWidget):
                 sub = "PCDSN-CDS-LAS"
                 if sub in allsubs.keys():
                     vl.append(allsubs[sub])
+                cds_vl = []
+                fez_vl = []
                 for v in vlist:
-                    if v not in vl and allvlan[v].split("-")[1] == "CDS":
-                        vl.append(v)
-                for v in vlist:
-                    if v not in vl and allvlan[v].split("-")[1] == "FEZ":
-                        vl.append(v)
+                    if v in vl:
+                        continue
+                    try:
+                        vlan_type = allvlan[v].split("-")[1]
+                    except IndexError:
+                        vlan_type = "NO_TYPE"
+                    if vlan_type == "CDS":
+                        cds_vl.append(v)
+                    elif vlan_type == "FEZ":
+                        fez_vl.append(v)
+                vl.extend(cds_vl)
+                vl.extend(fez_vl)
                 self._vlanList = vl
 
         # Now, go through the prefered vlan list order.  Add the
