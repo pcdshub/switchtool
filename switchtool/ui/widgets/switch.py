@@ -4,10 +4,10 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QSettings, QTimer, pyqtSignal, pyqtSlot
 
 from ...EpicsQT.qlogdisplay import QLogDisplay
+from ...sdfconfig import get_subnet_for_host
 from ...switch.switch import Switch
 from .. import dialogs
 from .vlan import VlanWidget
-from ...sdfconfig import get_subnet_for_host
 
 
 class SwitchWidget(QtWidgets.QWidget):
@@ -17,11 +17,20 @@ class SwitchWidget(QtWidgets.QWidget):
     updated = pyqtSignal()
     update_port = pyqtSignal(str, str, str, str, str, str)
 
-    def __init__(self, switch, user="admin", pw=None, switch_type=None, timeout=1.0, parent=None):
+    def __init__(
+        self, switch, user="admin", pw=None, switch_type=None, timeout=1.0, parent=None
+    ):
         super().__init__(parent=parent)
         self.resize(660, 700)
 
-        self._switch = PyQtSwitch(switch, user=user, pw=pw, enablepw=None, switch_type=switch_type, parent=self)
+        self._switch = PyQtSwitch(
+            switch,
+            user=user,
+            pw=pw,
+            enablepw=None,
+            switch_type=switch_type,
+            parent=self,
+        )
         self.switch_name = switch.split(".")[0]
         self.refresh_timeout = timeout * 3600000  # Now ms!
 
@@ -109,7 +118,6 @@ class SwitchWidget(QtWidgets.QWidget):
         self.timer.timeout.connect(self.need_refresh)
         self.repaint()
         QTimer.singleShot(100, self.initial_update)
-
 
     def initial_update(self):
         self.updated.connect(self.refresh)
@@ -326,12 +334,21 @@ class SwitchWidget(QtWidgets.QWidget):
                 sub = "PCDSN-CDS-LAS"
                 if sub in allsubs.keys():
                     vl.append(allsubs[sub])
+                cds_vl = []
+                fez_vl = []
                 for v in vlist:
-                    if v not in vl and allvlan[v].split("-")[1] == "CDS":
-                        vl.append(v)
-                for v in vlist:
-                    if v not in vl and allvlan[v].split("-")[1] == "FEZ":
-                        vl.append(v)
+                    if v in vl:
+                        continue
+                    try:
+                        vlan_type = allvlan[v].split("-")[1]
+                    except IndexError:
+                        vlan_type = "NO_TYPE"
+                    if vlan_type == "CDS":
+                        cds_vl.append(v)
+                    elif vlan_type == "FEZ":
+                        fez_vl.append(v)
+                vl.extend(cds_vl)
+                vl.extend(fez_vl)
                 self._vlanList = vl
 
         # Now, go through the prefered vlan list order.  Add the
@@ -421,14 +438,24 @@ class SwitchWidget(QtWidgets.QWidget):
 
 
 class PyQtSwitch(Switch):
-    def __init__(self, switchname, user="admin", pw=None, enablepw=None, switch_type=None, parent=None):
+    def __init__(
+        self,
+        switchname,
+        user="admin",
+        pw=None,
+        enablepw=None,
+        switch_type=None,
+        parent=None,
+    ):
         self.parent = parent
         if pw is None:
-            pw = dialogs.passwddialog.getPassword(
-                "Password for {:}: ".format(user)
-            )
+            pw = dialogs.passwddialog.getPassword("Password for {:}: ".format(user))
         super().__init__(
-            switchname, user=user, pw=pw, enablepw=enablepw, switch_type=switch_type,
+            switchname,
+            user=user,
+            pw=pw,
+            enablepw=enablepw,
+            switch_type=switch_type,
         )
 
     def update(self):

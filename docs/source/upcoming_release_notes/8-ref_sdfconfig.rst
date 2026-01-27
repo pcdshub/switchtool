@@ -25,4 +25,3 @@ Maintenance
 Contributors
 ------------
 - zllentz
-

@@ -10,15 +10,15 @@ at time of writing.
 """
 
 import functools
-import subprocess
 import json
+import subprocess
 
 
 @functools.lru_cache(maxsize=1000)
 def get_host_for_mac(mac_addr: str) -> str:
     """
     Returns the hostname associated with a mac_addr
-    
+
     Returns an empty string if the mac as not found.
 
     May raise if sdfconfig is not configured for the user.
