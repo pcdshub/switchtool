@@ -24,6 +24,7 @@ from .settings import (
 )
 
 LOG = logging.getLogger(LOG_CONF.get("logger_name", __name__))
+logger = logging.getLogger(__name__)
 
 
 class TelnetCommandRunner(object):
@@ -110,7 +111,6 @@ class CommandRunner(object):
         self.mode = ""
         self._config()
         self._rbuffer = None
-        self.debug = False
 
     def _config(self):
         self.ssh = paramiko.SSHClient()
@@ -169,8 +169,7 @@ class CommandRunner(object):
                     self._rbuffer = None
                 else:
                     self._rbuffer = self._rbuffer[idx + 1 :]
-                if self.debug:
-                    print("<<< %s" % r)
+                logger.debug("<<< %s" % r)
                 return r
             except:
                 # If there isn't a newline, try to read more.  If there
@@ -187,15 +186,13 @@ class CommandRunner(object):
                 if not didread:
                     r = self._rbuffer.decode("utf-8")
                     self._rbuffer = None
-                    if self.debug:
-                        print("<<< %s" % r)
+                    logger.debug("<<< %s" % r)
                     return r
 
     def exec_cmd(self, cmd, keepOutput=True):
         seen_echo = False
         seen_prompt = False
-        if self.debug:
-            print(">>> %s\\n" % cmd)
+        logger.debug(">>> %s\\n" % cmd)
         self.chan.send("%s%s" % (cmd, self.terminator))
         output = ""
 
@@ -203,24 +200,28 @@ class CommandRunner(object):
             line = self._readline()
             prompt_match = self.prompt_pattern.match(line.rstrip())
             if prompt_match and prompt_match.group("cmd") == cmd:
+                logger.debug("Seen prompt and echo")
                 self.mode = prompt_match.group("mode")
                 seen_echo = True
+            else:
+                logger.debug(f"Not seen prompt and echo for {self.prompt_pattern}")
 
         while not seen_prompt:
             line = self._readline()
             page_cont = self.page_cont_pattern.match(line)
             if page_cont:
+                logger.debug("page continue seen")
                 self.chan.send(" %s" % self.terminator)
-                if self.debug:
-                    print(">>> \\n")
+                logger.debug(">>> \\n")
             else:
+                logger.debug("no page continue seen")
                 prompt_match = self.prompt_pattern.match(line)
-                if self.debug and prompt_match:
-                    print("prompt_match!")
                 if prompt_match:
+                    logger.debug("prompt_match!")
                     self.mode = prompt_match.group("mode")
                     seen_prompt = True
                 else:
+                    logger.debug("no prompt match")
                     output += line
         self.chan.send(" %s" % self.terminator)
         if keepOutput:

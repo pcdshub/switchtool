@@ -61,10 +61,15 @@ def main():
         print("Use --switch argument to provide switch name")
         return None
 
+    log_level = max(0, logging.WARNING - 10 * kwargs["verbose"])
+    # In the GUI
     log = logging.getLogger("switchtool.switch")
     stream = logging.StreamHandler()
-    stream.setLevel(max(0, logging.WARNING - 10 * kwargs["verbose"]))
+    stream.setLevel(log_level)
     log.addHandler(stream)
+    # In the terminal
+    if log_level < logging.INFO:
+        logging.basicConfig(level=log_level)
     creds = read_creds()
 
     # Launch GUI
