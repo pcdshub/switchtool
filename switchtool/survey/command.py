@@ -217,6 +217,12 @@ class CommandRunner(object):
                 else:
                     logger.debug("no prompt match")
                     output += line
+                    if len(line) == 0:
+                        self.chan.send(" %s" % self.terminator)
+                        logger.debug(
+                            "Empty line, attempt page continue to avoid hanging"
+                        )
+                        logger.debug(">>> \\n")
         self.chan.send(" %s" % self.terminator)
         if keepOutput:
             return output
